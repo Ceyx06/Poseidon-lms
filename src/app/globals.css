@@ -1,0 +1,89 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Poseidon Brand Palette */
+
+@layer base {
+  :root {
+    --navy: #0a1628;
+    --navy2: #0f2044;
+    --panel: #111e35;
+    --panel2: #162440;
+    --border: rgba(255, 255, 255, 0.07);
+    --accent: #1a9bdc;
+    --accent2: #0dd3b8;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(26, 155, 220, 0.3) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(26, 155, 220, 0.3);
+    border-radius: 3px;
+  }
+}
+
+@layer utilities {
+  .font-syne { font-family: var(--font-syne), sans-serif; }
+  .font-dm   { font-family: var(--font-dm), sans-serif; }
+
+  .glass {
+    background: rgba(17, 30, 53, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .gradient-border {
+    position: relative;
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(26,155,220,0.4), rgba(13,211,184,0.2));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .pulse-dot {
+    animation: pulse-ring 2s infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.3); }
+  }
+
+  .slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}

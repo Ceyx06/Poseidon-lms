@@ -1,0 +1,241 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(STAFF)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  auditLogs     AuditLog[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+// ─── Core Maritime Entities ──────────────────────────────────────────────────
+
+model Vessel {
+  id            String    @id @default(cuid())
+  name          String
+  imoNumber     String    @unique
+  flag          String
+  vesselType    String
+  grossTonnage  Float?
+  owner         String
+  operator      String?
+  status        VesselStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  certificates  VesselCertificate[]
+  inspections   ShipInspection[]
+  portPermits   PortPermit[]
+}
+
+enum VesselStatus {
+  ACTIVE
+  DRYDOCK
+  DECOMMISSIONED
+}
+
+model CrewMember {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  rank          String
+  nationality   String
+  dateOfBirth   DateTime
+  seafarerIdNo  String    @unique
+  email         String?
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  documents     CrewDocument[]
+}
+
+// ─── Document Types ──────────────────────────────────────────────────────────
+
+model VesselCertificate {
+  id              String    @id @default(cuid())
+  vesselId        String
+  vessel          Vessel    @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  certificateType String    // e.g. "Safety Management Certificate", "Load Line Certificate"
+  certificateNo   String?
+  issuedBy        String
+  issueDate       DateTime
+  expiryDate      DateTime
+  status          DocStatus @default(VALID)
+  remarks         String?
+  filePath        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditLogs       AuditLog[]
+
+  @@index([vesselId])
+  @@index([expiryDate])
+}
+
+model CrewDocument {
+  id              String    @id @default(cuid())
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+  documentType    String    // e.g. "STCW", "Medical Certificate", "Seaman's Book"
+  documentNo      String?
+  issuedBy        String
+  issueDate       DateTime
+  expiryDate      DateTime
+  status          DocStatus @default(VALID)
+  remarks         String?
+  filePath        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditLogs       AuditLog[]
+
+  @@index([crewMemberId])
+  @@index([expiryDate])
+}
+
+model PortPermit {
+  id              String    @id @default(cuid())
+  vesselId        String
+  vessel          Vessel    @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  permitType      String    // e.g. "Port Entry", "Dangerous Goods", "PSC Clearance"
+  permitNo        String?
+  portName        String
+  portCountry     String
+  issuedBy        String
+  issueDate       DateTime
+  expiryDate      DateTime
+  status          DocStatus @default(VALID)
+  remarks         String?
+  filePath        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditLogs       AuditLog[]
+
+  @@index([vesselId])
+  @@index([expiryDate])
+}
+
+model ShipInspection {
+  id              String    @id @default(cuid())
+  vesselId        String
+  vessel          Vessel    @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  inspectionType  String    // e.g. "Hull & Machinery Survey", "Annual Safety Inspection"
+  inspectionNo    String?
+  inspector       String
+  inspectionDate  DateTime
+  nextDueDate     DateTime
+  result          InspectionResult?
+  status          DocStatus @default(VALID)
+  remarks         String?
+  filePath        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditLogs       AuditLog[]
+
+  @@index([vesselId])
+  @@index([nextDueDate])
+}
+
+enum DocStatus {
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  RENEWED
+  CANCELLED
+}
+
+enum InspectionResult {
+  PASSED
+  PASSED_WITH_REMARKS
+  FAILED
+  PENDING
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id])
+  action              String    // CREATE, UPDATE, DELETE, VIEW
+  entityType          String    // VesselCertificate, CrewDocument, etc.
+  entityId            String
+  description         String
+  createdAt           DateTime  @default(now())
+
+  vesselCertificate   VesselCertificate? @relation(fields: [entityId], references: [id], map: "AuditLog_vesselCertId_fkey")
+  crewDocument        CrewDocument?      @relation(fields: [entityId], references: [id], map: "AuditLog_crewDocId_fkey")
+  portPermit          PortPermit?        @relation(fields: [entityId], references: [id], map: "AuditLog_portPermitId_fkey")
+  shipInspection      ShipInspection?    @relation(fields: [entityId], references: [id], map: "AuditLog_shipInspId_fkey")
+
+  @@index([userId])
+  @@index([entityType, entityId])
+}
+
+// ─── Notification / Alert ────────────────────────────────────────────────────
+
+model Alert {
+  id          String    @id @default(cuid())
+  entityType  String
+  entityId    String
+  entityName  String
+  daysLeft    Int
+  urgency     AlertUrgency
+  dismissed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([dismissed])
+  @@index([urgency])
+}
+
+enum AlertUrgency {
+  EXPIRED
+  CRITICAL   // <= 30 days
+  WARNING    // 31-60 days
+  CAUTION    // 61-90 days
+}
+
+model OWWARecord {
+  id                String   @id @default(cuid())
+  crewName          String
+  birthdate         DateTime?
+  eRegNo            String?
+  dateProcessed     DateTime?
+  dateDeployed      DateTime?
+  statusTransaction String?
+  oecNo             String?
+  rpfNo             String?
+  position          String?
+  vessel            String?
+  principal         String?
+  owwaRenewalDate   DateTime?
+  remarks           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([owwaRenewalDate])
+}
