@@ -27,6 +27,7 @@ enum Role {
   ADMIN
   MANAGER
   STAFF
+  COORDINATOR
 }
 
 // ─── Core Maritime Entities ──────────────────────────────────────────────────
@@ -238,4 +239,145 @@ model OWWARecord {
   updatedAt         DateTime @updatedAt
 
   @@index([owwaRenewalDate])
+}
+
+model CrewProfile {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  middleName  String?
+  rank        String
+  vessel      String?
+  principal   String?
+  phone       String?
+  email       String?
+  address     String?
+  dateOfBirth DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents        CrewFile[]
+  seaServiceRecords SeaServiceRecord[]
+  employmentCerts  EmploymentCert[]
+  resumes          CrewResume[]
+  metrobankForms   MetrobankForm[]
+  panstarDepartures PanstarDeparture[]
+  panstarContracts PanstarContract[]
+  eRegistrations   ERegistration[]
+}
+
+model CrewFile {
+  id          String      @id @default(cuid())
+  crewId      String
+  crew        CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  docType     String
+  docName     String
+  fileUrl     String
+  fileSize    Int?
+  mimeType    String?
+  uploadedAt  DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model SeaServiceRecord {
+  id          String      @id @default(cuid())
+  crewId      String
+  crew        CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  vesselName  String
+  rank        String
+  signOnDate  DateTime
+  signOffDate DateTime?
+  remarks     String?
+  fileUrl     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model EmploymentCert {
+  id          String      @id @default(cuid())
+  crewId      String
+  crew        CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  certNo      String?
+  issuedDate  DateTime?
+  remarks     String?
+  fileUrl     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model CrewResume {
+  id          String      @id @default(cuid())
+  crewId      String
+  crew        CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  version     String?
+  remarks     String?
+  fileUrl     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model MetrobankForm {
+  id          String      @id @default(cuid())
+  crewId      String
+  crew        CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  referralNo  String?
+  remarks     String?
+  fileUrl     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model PanstarDeparture {
+  id             String      @id @default(cuid())
+  crewId         String
+  crew           CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  departureDate  DateTime?
+  vessel         String?
+  remarks        String?
+  fileUrl        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model PanstarContract {
+  id             String      @id @default(cuid())
+  crewId         String
+  crew           CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  contractStart  DateTime?
+  contractEnd    DateTime?
+  vessel         String?
+  rank           String?
+  remarks        String?
+  fileUrl        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([crewId])
+}
+
+model ERegistration {
+  id            String      @id @default(cuid())
+  crewId        String
+  crew          CrewProfile @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  accountEmail  String?
+  eRegNo        String?
+  marineRights  String?
+  remarks       String?
+  fileUrl       String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([crewId])
 }
