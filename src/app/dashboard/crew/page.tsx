@@ -73,7 +73,7 @@ function normalizeDate(value: string): string {
     if (!Number.isNaN(d1) && !Number.isNaN(d2) && !Number.isNaN(y)) {
       // Prefer dd/mm/yyyy display style from user requirement.
       const day = String(d1).padStart(2, "0");
-      const month = String(d2).padStart(2, "0"); afa
+      const month = String(d2).padStart(2, "0"); 
       return `${y}-${month}-${day}`;
     }
   }
