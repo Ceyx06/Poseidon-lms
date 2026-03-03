@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { getDaysLeft, getUrgency } from "@/lib/utils";
 import { computeCrewExpiryDate, listCrewDocuments } from "@/lib/crew-documents";
+import { addMonths, differenceInCalendarDays, isBefore, startOfDay, subMonths, subWeeks } from "date-fns";
 
 export async function getDashboardStats() {
   const today = new Date();
@@ -16,15 +17,16 @@ export async function getDashboardStats() {
     portPermits,
     shipInspections,
     totalVessels,
-    totalCrew,
   ] = await Promise.all([
     prisma.vesselCertificate.findMany({ select: { expiryDate: true, status: true } }),
     listCrewDocuments(),
     prisma.portPermit.findMany({ select: { expiryDate: true, status: true } }),
     prisma.shipInspection.findMany({ select: { nextDueDate: true, status: true } }),
     prisma.vessel.count({ where: { status: "ACTIVE" } }),
-    prisma.crewMember.count(),
   ]);
+
+  // Dashboard "Total Crew" should follow Crew Documents table rows (OWWA records).
+  const totalCrew = crewRows.length;
 
   function countByUrgency(records: { expiryDate: Date }[]) {
     return records.reduce(
@@ -75,32 +77,98 @@ export async function getDashboardStats() {
 }
 
 export async function getExpiringAlerts() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const in90Days = new Date();
-  in90Days.setDate(today.getDate() + 90);
+  const today = startOfDay(new Date());
 
   const records = await listCrewDocuments();
 
-  const alerts = records
-    .map((r) => {
-      const expiryDate = computeCrewExpiryDate(r);
-      if (!expiryDate) return null;
-      const daysLeft = getDaysLeft(expiryDate);
+  type AlertStatus = "EXPIRED" | "EXPIRING";
+  const statusRank: Record<AlertStatus, number> = {
+    EXPIRED: 0,
+    EXPIRING: 1,
+  };
 
-      return {
-        id: r.id,
-        entityType: "CrewDocument" as const,
-        name: r.crewName,
-        owner: r.vessel ?? r.principal ?? "-",
-        expiryDate,
-        daysLeft,
-        urgency: getUrgency(daysLeft),
-      };
+  const alerts = records
+    .flatMap((r) => {
+      const name = r.crewName?.trim() || "Unnamed";
+      const rows: Array<{
+        id: string;
+        entityType: "CrewDocument";
+        name: string;
+        document: "OWWA RENEWAL" | "OEC";
+        startDate: Date;
+        expiryDate: Date;
+        daysLeft: number;
+        warnDays: number;
+        urgency: ReturnType<typeof getUrgency>;
+        status: AlertStatus;
+        shouldShow: boolean;
+      }> = [];
+
+      if (r.owwaRenewalDate) {
+        // OWWA: trigger exactly 2 calendar months before renewal date.
+        const expiryDate = startOfDay(r.owwaRenewalDate);
+        const notificationStartDate = subMonths(expiryDate, 2);
+        const daysLeft = differenceInCalendarDays(expiryDate, today);
+        const warnDays = 60; // used only for UI metadata
+        rows.push({
+          id: `${r.id}-owwa`,
+          entityType: "CrewDocument",
+          name,
+          document: "OWWA RENEWAL",
+          startDate: r.owwaStartDate ?? r.owwaRenewalDate,
+          expiryDate,
+          daysLeft,
+          warnDays,
+          urgency: getUrgency(daysLeft),
+          status: daysLeft < 0 ? "EXPIRED" : "EXPIRING",
+          shouldShow: !isBefore(today, notificationStartDate),
+        });
+      }
+
+      if (r.dateProcessed) {
+        // OEC: expires after 2 months, but alert starts 2 weeks before expiry.
+        const expiryDate = startOfDay(addMonths(r.dateProcessed, 2));
+        const notificationStartDate = subWeeks(expiryDate, 2);
+        const daysLeft = differenceInCalendarDays(expiryDate, today);
+        const warnDays = 14; // 2 weeks
+        rows.push({
+          id: `${r.id}-oec`,
+          entityType: "CrewDocument",
+          name,
+          document: "OEC",
+          startDate: r.dateProcessed,
+          expiryDate,
+          daysLeft,
+          warnDays,
+          urgency: getUrgency(daysLeft),
+          status: daysLeft < 0 ? "EXPIRED" : "EXPIRING",
+          shouldShow: !isBefore(today, notificationStartDate),
+        });
+      }
+
+      return rows;
     })
-    .filter((a): a is NonNullable<typeof a> => a !== null)
-    .filter((a) => a.expiryDate <= in90Days)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+    // Show EXPIRED and in-window EXPIRING alerts only.
+    .filter((a) => a.shouldShow)
+    .sort((a, b) => {
+      // 1) EXPIRED first, 2) then EXPIRING.
+      const rankDiff = statusRank[a.status] - statusRank[b.status];
+      if (rankDiff !== 0) return rankDiff;
+
+      if (a.status === "EXPIRED") {
+        // Within EXPIRED: most overdue first.
+        const aDaysOverdue = Math.abs(a.daysLeft);
+        const bDaysOverdue = Math.abs(b.daysLeft);
+        const overdueDiff = bDaysOverdue - aDaysOverdue;
+        if (overdueDiff !== 0) return overdueDiff;
+      } else {
+        // Within EXPIRING: closest expiry first.
+        const daysLeftDiff = a.daysLeft - b.daysLeft;
+        if (daysLeftDiff !== 0) return daysLeftDiff;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
 
   return alerts;
 }

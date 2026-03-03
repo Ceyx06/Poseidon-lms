@@ -3,8 +3,8 @@ import Link from "next/link";
 
 export default async function CoordinatorDashboardPage() {
   const [totalCrew, totalDocs] = await Promise.all([
-    prisma.crewProfile.count(),
-    prisma.crewFile.count(),
+    prisma.crewMember.count(),
+    prisma.crewDocument.count(),
   ]);
 
   const modules = [

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 export type CrewDocumentRecord = {
   id: string;
   crewName: string;
+  owwaStartDate: Date | null;
   birthdate: Date | null;
   eRegNo: string | null;
   dateProcessed: Date | null;
@@ -19,6 +20,7 @@ export type CrewDocumentRecord = {
 
 export type CrewDocumentPayload = {
   crewName: string;
+  owwaStartDate: Date | null;
   birthdate: Date | null;
   eRegNo: string | null;
   dateProcessed: Date | null;
@@ -64,6 +66,7 @@ export async function listCrewDocuments(): Promise<CrewDocumentRecord[]> {
       SELECT
         "id",
         "crewName",
+        "owwaStartDate",
         "birthdate",
         "eRegNo",
         "dateProcessed",
@@ -95,6 +98,7 @@ export async function createCrewDocument(data: CrewDocumentPayload): Promise<Cre
     INSERT INTO "OWWARecord" (
       "id",
       "crewName",
+      "owwaStartDate",
       "birthdate",
       "eRegNo",
       "dateProcessed",
@@ -112,6 +116,7 @@ export async function createCrewDocument(data: CrewDocumentPayload): Promise<Cre
     VALUES (
       ${id},
       ${data.crewName},
+      ${data.owwaStartDate},
       ${data.birthdate},
       ${data.eRegNo},
       ${data.dateProcessed},
@@ -129,6 +134,7 @@ export async function createCrewDocument(data: CrewDocumentPayload): Promise<Cre
     RETURNING
       "id",
       "crewName",
+      "owwaStartDate",
       "birthdate",
       "eRegNo",
       "dateProcessed",
@@ -157,6 +163,7 @@ export async function updateCrewDocument(id: string, data: CrewDocumentPayload):
     UPDATE "OWWARecord"
     SET
       "crewName" = ${data.crewName},
+      "owwaStartDate" = ${data.owwaStartDate},
       "birthdate" = ${data.birthdate},
       "eRegNo" = ${data.eRegNo},
       "dateProcessed" = ${data.dateProcessed},

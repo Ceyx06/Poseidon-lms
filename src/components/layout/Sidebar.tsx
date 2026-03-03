@@ -64,7 +64,7 @@ export default function Sidebar() {
           padding: "0 12px",
           marginBottom: "8px",
         }}>
-          Main Menu
+          Admin
         </p>
 
         {NAV_ITEMS.map((item) => {

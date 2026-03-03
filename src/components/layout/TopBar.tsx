@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 
 interface TopBarProps {
@@ -7,6 +9,31 @@ interface TopBarProps {
 }
 
 export default function TopBar({ user }: TopBarProps) {
+  const router = useRouter();
+  const [profile, setProfile] = useState<{ name?: string; email?: string; imageUrl?: string | null } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/account/security", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        setProfile({
+          name: data.name,
+          email: data.email,
+          imageUrl: data.imageUrl ?? null,
+        });
+      })
+      .catch(() => { });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const displayName = profile?.name || user?.name || "User";
+  const displayEmail = profile?.email || user?.email || "";
+  const displayImage = profile?.imageUrl || null;
+
   const dateStr = new Date().toLocaleDateString("en-PH", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
@@ -46,13 +73,25 @@ export default function TopBar({ user }: TopBarProps) {
           <span style={{ fontSize: "11px", color: "#0d8a7a" }}>Live</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/security")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
           <div style={{ textAlign: "right" }}>
             <p style={{ fontSize: "13px", fontWeight: 500, color: "#1a2d45" }}>
-              {user?.name}
+              {displayName}
             </p>
             <p style={{ fontSize: "11px", color: "#a0b0c0" }}>
-              {user?.email}
+              {displayEmail}
             </p>
           </div>
           <div style={{
@@ -67,21 +106,35 @@ export default function TopBar({ user }: TopBarProps) {
             fontSize: "14px",
             fontWeight: "bold",
             color: "#8a6010",
+            overflow: "hidden",
           }}>
-            {user?.name?.[0]?.toUpperCase() ?? "U"}
+            {displayImage ? (
+              <img
+                src={displayImage}
+                alt="Profile"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              displayName?.[0]?.toUpperCase() ?? "U"
+            )}
           </div>
-        </div>
+        </button>
 
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           style={{
-            fontSize: "12px",
-            color: "#a0b0c0",
+            fontFamily: "var(--font-cinzel)",
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "#ffffff",
             cursor: "pointer",
-            padding: "6px 12px",
-            borderRadius: "8px",
-            border: "1px solid #e8eef5",
-            background: "transparent",
+            padding: "9px 14px",
+            borderRadius: "10px",
+            border: "none",
+            background: "linear-gradient(135deg, #b8841f, #e8b84b, #c9972a)",
+            boxShadow: "0 4px 20px rgba(201,151,42,0.35)",
           }}
         >
           Sign out
