@@ -7,7 +7,7 @@ import { getDaysLeft } from "@/lib/utils";
 export const revalidate = 60;
 type CrewAlert = Awaited<ReturnType<typeof getExpiringAlerts>>[number];
 const OWWA_WARN_DAYS = 60;
-const OEC_WARN_DAYS = 30;
+const OEC_WARN_DAYS = 14;
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 24 }}>
         <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "#2563eb", marginBottom: 4 }}>
-          Fleet Management
+          Poseidon Management
         </p>
         <h1 style={{
           fontFamily: "var(--font-cinzel)", fontWeight: "bold",
@@ -360,7 +360,7 @@ export default async function DashboardPage() {
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <span style={{ fontSize: 11, color: "#94a3b8" }}>
-              Showing {alerts.length} alert{alerts.length !== 1 ? "s" : ""} — documents expiring within 90 days or already expired
+              Showing {alerts.length} alert{alerts.length !== 1 ? "s" : ""} — expiring in active notification windows or already expired
             </span>
             <Link href="/dashboard/crew" style={{
               fontSize: 11, fontWeight: 600, color: "#2563eb",
@@ -375,6 +375,8 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
+
 
 
 

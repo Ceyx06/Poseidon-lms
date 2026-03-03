@@ -4,6 +4,7 @@ import { deleteCrewDocument, updateCrewDocument, type CrewDocumentPayload } from
 
 type CrewDocumentInput = {
   crewName?: string;
+  owwaStartDate?: string | null;
   birthdate?: string | null;
   eRegNo?: string | null;
   dateProcessed?: string | null;
@@ -32,6 +33,7 @@ function toDate(value?: string | null): Date | null {
 function parsePayload(input: CrewDocumentInput): CrewDocumentPayload {
   return {
     crewName: (input.crewName ?? "").trim(),
+    owwaStartDate: toDate(input.owwaStartDate),
     birthdate: toDate(input.birthdate),
     eRegNo: toNullable(input.eRegNo),
     dateProcessed: toDate(input.dateProcessed),

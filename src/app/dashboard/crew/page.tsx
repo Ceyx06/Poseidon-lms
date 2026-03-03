@@ -25,11 +25,11 @@ type Column = {
 type SelectedCell = { row: number; col: number };
 type EditingCell = { row: number; col: number; value: string; original: string };
 
-// ── expiry config ─────────────────────────────────────────────────────────────
+// â”€â”€ expiry config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type ExpiryRule = { key: keyof CrewForm; label: string; addMonths: number; warnDays: number };
 const EXPIRY_RULES: ExpiryRule[] = [
   { key: "owwaRenewalDate", label: "OWWA Renewal", addMonths: 24, warnDays: 60 }, // notify 2 months before expiry
-  { key: "oecNo", label: "OEC No.", addMonths: 2, warnDays: 30 }, // 2 months - uses oecNo field date
+  { key: "oecNo", label: "OEC", addMonths: 2, warnDays: 14 }, // expires in 2 months, notify 2 weeks before expiry
 ];
 
 // Days-before-expiry to show "expiring soon" warning (orange)
@@ -51,15 +51,20 @@ function daysUntil(expiryStr: string): number {
   return Math.round((exp.getTime() - now.getTime()) / 86_400_000);
 }
 
-type AlertItem = {
-  crewName: string;
+type AlertDocument = {
   field: keyof CrewForm;
   fieldLabel: string;
   startDate: string;
   expiryDate: string;
   daysLeft: number;
   warnDays: number;
+};
+
+type AlertItem = {
+  crewName: string;
   rowIndex: number;
+  daysLeft: number; // earliest/most urgent among this crew's documents
+  documents: AlertDocument[];
 };
 
 const STATUS_OPTIONS = ["DIS-EMBARKATION", "EMBARKATION"];
@@ -68,11 +73,11 @@ const COLUMNS: Column[] = [
   { key: "owwaRenewalDate", label: "OWWA Renewal", type: "date", width: 148 },
   { key: "crewName", label: "Name of Crew", type: "text", width: 200 },
   { key: "birthdate", label: "Birthdate", type: "date", width: 118 },
-  { key: "eRegNo", label: "E-Reg No.", type: "text", width: 100 },
+  { key: "eRegNo", label: "E-Reg No.", type: "text", width: 160 },
   { key: "dateProcessed", label: "Date Processed", type: "date", width: 138 },
   { key: "dateDeployed", label: "Date Deployed", type: "date", width: 138 },
   { key: "statusTransaction", label: "Status", type: "select", width: 175, options: STATUS_OPTIONS },
-  { key: "oecNo", label: "OEC No.", type: "text", width: 96 },
+  { key: "oecNo", label: "OEC Date", type: "date", width: 128 },
   { key: "rpfNo", label: "RPF No.", type: "text", width: 96 },
 ];
 
@@ -81,7 +86,7 @@ const EMPTY_FORM: CrewForm = {
   dateProcessed: "", dateDeployed: "", statusTransaction: "", oecNo: "", rpfNo: "",
 };
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normalizeDate(v: string): string {
   const raw = v.trim();
   if (!raw) return "";
@@ -106,7 +111,7 @@ function fromApiRow(row: any): RowData {
       owwaRenewalDate: d(row.owwaRenewalDate), crewName: row.crewName ?? "",
       birthdate: d(row.birthdate), eRegNo: row.eRegNo ?? "",
       dateProcessed: d(row.dateProcessed), dateDeployed: d(row.dateDeployed),
-      statusTransaction: row.statusTransaction ?? "", oecNo: row.oecNo ?? "", rpfNo: row.rpfNo ?? "",
+      statusTransaction: row.statusTransaction ?? "", oecNo: normalizeDate(row.oecNo ?? ""), rpfNo: row.rpfNo ?? "",
     }
   };
 }
@@ -119,7 +124,7 @@ function toApi(form: CrewForm) {
   };
 }
 
-// ── design tokens ─────────────────────────────────────────────────────────────
+// â”€â”€ design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const navy = "#0f1f3d";
 const accent = "#2563eb";
 const accentL = "#dbeafe";
@@ -137,7 +142,7 @@ const rowHov = "#f1f5f9";
 const font = `'DM Sans', 'Segoe UI', system-ui, sans-serif`;
 const ROW_H = 38;
 
-// ── sub-components ────────────────────────────────────────────────────────────
+// â”€â”€ sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Badge({ v }: { v: string }) {
   const emb = v === "EMBARKATION";
   return (
@@ -163,7 +168,7 @@ function BellIcon() {
 
 function AlertPanel({ alerts, onDismiss }: { alerts: AlertItem[]; onDismiss: () => void }) {
   const expired = alerts.filter(a => a.daysLeft < 0);
-  const expiring = alerts.filter(a => a.daysLeft >= 0 && a.daysLeft <= a.warnDays);
+  const expiring = alerts.filter(a => a.daysLeft >= 0);
 
   if (alerts.length === 0) return null;
 
@@ -188,7 +193,7 @@ function AlertPanel({ alerts, onDismiss }: { alerts: AlertItem[]; onDismiss: () 
           </span>
           <span style={{ fontSize: 13, fontWeight: 700, color: expired.length ? red : orange }}>
             {expired.length > 0
-              ? `${expired.length} Expired · ${expiring.length} Expiring Soon`
+              ? `${expired.length} Expired Â· ${expiring.length} Expiring Soon`
               : `${expiring.length} Expiring Soon`}
           </span>
           <span style={{
@@ -199,15 +204,7 @@ function AlertPanel({ alerts, onDismiss }: { alerts: AlertItem[]; onDismiss: () 
             {alerts.length} alert{alerts.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onDismiss}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: muted, fontSize: 18, lineHeight: 1, padding: "0 2px",
-          }}
-          title="Dismiss alerts"
-        >×</button>
+
       </div>
 
       {/* Alert rows */}
@@ -239,6 +236,9 @@ function AlertRow({ a }: { a: AlertItem }) {
   const isExpired = a.daysLeft < 0;
   const color = isExpired ? red : orange;
   const bg = isExpired ? "#fff5f5" : "#fffdf0";
+  const docs = [...a.documents].sort((x, y) => x.daysLeft - y.daysLeft);
+  const earliest = docs[0];
+
   return (
     <div style={{
       display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center",
@@ -252,16 +252,22 @@ function AlertRow({ a }: { a: AlertItem }) {
         <span style={{ fontSize: 13, fontWeight: 600, color: textC, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {a.crewName || <em style={{ color: muted }}>Unnamed crew</em>}
         </span>
-        {/* Field badge */}
-        <span style={{
-          fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
-          background: color + "22", color, flexShrink: 0,
-        }}>
-          {a.fieldLabel}
-        </span>
+        {/* Document badges */}
+        {docs.map((d) => (
+          <span
+            key={d.fieldLabel}
+            style={{
+              fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
+              background: color + "22", color, flexShrink: 0,
+            }}
+          >
+            {d.fieldLabel}
+          </span>
+        ))}
         {/* Dates */}
         <span style={{ fontSize: 12, color: muted, whiteSpace: "nowrap", flexShrink: 0 }}>
-          Started {displayDate(a.startDate)} · Expires {displayDate(a.expiryDate)}
+          Earliest expiry {displayDate(earliest?.expiryDate ?? "")}
+          {docs.length > 1 ? ` · ${docs.length} documents` : ""}
         </span>
       </div>
       {/* Days left pill */}
@@ -278,7 +284,7 @@ function AlertRow({ a }: { a: AlertItem }) {
   );
 }
 
-// ── main component ────────────────────────────────────────────────────────────
+// â”€â”€ main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function CrewDocumentsPage() {
   const [rows, setRows] = useState<RowData[]>([]);
   const [selected, setSelected] = useState<SelectedCell | null>(null);
@@ -295,13 +301,15 @@ export default function CrewDocumentsPage() {
   const rollbackRef = useRef<Map<string, CrewForm>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const visual = useMemo(() => Math.max(rows.length, 20), [rows.length]);
+  // Render only existing rows; keep 1 empty visual row when list is empty.
+  const visual = useMemo(() => Math.max(rows.length, 1), [rows.length]);
   const ck = (r: number, c: number) => `${r}:${c}`;
   const rAt = (r: number) => r < rows.length ? rows[r].data : EMPTY_FORM;
 
-  // ── compute alerts ──────────────────────────────────────────────────────────
+  // â”€â”€ compute alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const alerts = useMemo<AlertItem[]>(() => {
-    const result: AlertItem[] = [];
+    const documentsByRow = new Map<number, AlertDocument[]>();
+
     rows.forEach((row, rowIndex) => {
       EXPIRY_RULES.forEach(rule => {
         const startDate = row.data[rule.key] as string;
@@ -309,28 +317,41 @@ export default function CrewDocumentsPage() {
         const expiryDate = addMonths(startDate, rule.addMonths);
         if (!expiryDate) return;
         const days = daysUntil(expiryDate);
+
         if (days <= rule.warnDays) {
-          result.push({
-            crewName: row.data.crewName,
+          const doc: AlertDocument = {
             field: rule.key,
             fieldLabel: rule.label,
             startDate,
             expiryDate,
             daysLeft: days,
             warnDays: rule.warnDays,
-            rowIndex,
-          });
+          };
+          const existing = documentsByRow.get(rowIndex) ?? [];
+          existing.push(doc);
+          documentsByRow.set(rowIndex, existing);
         }
       });
     });
-    // Sort: expired first, then by days ascending
+
+    const result: AlertItem[] = Array.from(documentsByRow.entries()).map(([rowIndex, documents]) => {
+      const sortedDocs = documents.sort((a, b) => a.daysLeft - b.daysLeft);
+      return {
+        crewName: rows[rowIndex]?.data.crewName || "",
+        rowIndex,
+        daysLeft: sortedDocs[0]?.daysLeft ?? Infinity,
+        documents: sortedDocs,
+      };
+    });
+
+    // Sort: expired first, then by most urgent upcoming.
     return result.sort((a, b) => a.daysLeft - b.daysLeft);
   }, [rows]);
 
   // Reset dismissed state when new alerts appear
   useEffect(() => { setAlertsDismissed(false); }, [alerts.length]);
 
-  // ── per-cell expiry status ─────────────────────────────────────────────────
+  // â”€â”€ per-cell expiry status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function getCellExpiry(rowIndex: number, colKey: keyof CrewForm): "expired" | "warn" | null {
     const rule = EXPIRY_RULES.find(r => r.key === colKey);
     if (!rule || rowIndex >= rows.length) return null;
@@ -489,7 +510,6 @@ export default function CrewDocumentsPage() {
   const canDelete = !!selected && selected.row < rows.length && !deletingRow;
   const totalW = 40 + COLUMNS.reduce((s, c) => s + (c.width ?? 140), 0);
 
-  // ── render ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -607,13 +627,13 @@ export default function CrewDocumentsPage() {
         <div className="cp-toolbar">
           <button type="button" className="cp-btn cp-btn-add" onClick={addBlankRow} disabled={addingRow}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-            {addingRow ? "Adding…" : "Add Row"}
+            {addingRow ? "Addingâ€¦" : "Add Row"}
           </button>
           <button type="button" className="cp-btn cp-btn-del" onClick={deleteSelectedRow} disabled={!canDelete}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10L10 2M2 2l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-            {deletingRow ? "Deleting…" : "Delete Row"}
+            {deletingRow ? "Deletingâ€¦" : "Delete Row"}
           </button>
-          {loading && <span style={{ fontSize: 12, color: muted, marginLeft: 4 }}>Loading…</span>}
+          {loading && <span style={{ fontSize: 12, color: muted, marginLeft: 4 }}>Loadingâ€¦</span>}
         </div>
 
         {error && <div className="cp-error">{error}</div>}
@@ -763,12 +783,15 @@ export default function CrewDocumentsPage() {
           <div className="cp-footer">
             <span className="cp-footer-txt">
               {rows.length} record{rows.length !== 1 ? "s" : ""}&nbsp;
-              {rows.length > 0 && "· Click to select · Double-click or type to edit"}
+              {rows.length > 0 && "Â· Click to select Â· Double-click or type to edit"}
             </span>
-            {loading && <span style={{ fontSize: 11, color: muted }}>Syncing…</span>}
+            {loading && <span style={{ fontSize: 11, color: muted }}>Syncingâ€¦</span>}
           </div>
         </div>
       </div>
     </>
   );
 }
+
+
+

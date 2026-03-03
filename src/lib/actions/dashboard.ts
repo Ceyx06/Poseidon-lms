@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { getDaysLeft, getUrgency } from "@/lib/utils";
 import { computeCrewExpiryDate, listCrewDocuments } from "@/lib/crew-documents";
+import { addMonths, differenceInCalendarDays, isBefore, startOfDay, subMonths, subWeeks } from "date-fns";
 
 export async function getDashboardStats() {
   const today = new Date();
@@ -16,15 +17,16 @@ export async function getDashboardStats() {
     portPermits,
     shipInspections,
     totalVessels,
-    totalCrew,
   ] = await Promise.all([
     prisma.vesselCertificate.findMany({ select: { expiryDate: true, status: true } }),
     listCrewDocuments(),
     prisma.portPermit.findMany({ select: { expiryDate: true, status: true } }),
     prisma.shipInspection.findMany({ select: { nextDueDate: true, status: true } }),
     prisma.vessel.count({ where: { status: "ACTIVE" } }),
-    prisma.crewMember.count(),
   ]);
+
+  // Dashboard "Total Crew" should follow Crew Documents table rows (OWWA records).
+  const totalCrew = crewRows.length;
 
   function countByUrgency(records: { expiryDate: Date }[]) {
     return records.reduce(
@@ -75,10 +77,7 @@ export async function getDashboardStats() {
 }
 
 export async function getExpiringAlerts() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const in90Days = new Date();
-  in90Days.setDate(today.getDate() + 90);
+  const today = startOfDay(new Date());
 
   const records = await listCrewDocuments();
 
@@ -95,37 +94,35 @@ export async function getExpiringAlerts() {
         daysLeft: number;
         warnDays: number;
         urgency: ReturnType<typeof getUrgency>;
+        shouldShow: boolean;
       }> = [];
 
       if (r.owwaRenewalDate) {
-        const expiryDate = new Date(
-          r.owwaRenewalDate.getFullYear() + 2,
-          r.owwaRenewalDate.getMonth(),
-          r.owwaRenewalDate.getDate()
-        );
-        const daysLeft = getDaysLeft(expiryDate);
-        const warnDays = 60;
+        // OWWA: trigger exactly 2 calendar months before renewal date.
+        const expiryDate = startOfDay(r.owwaRenewalDate);
+        const notificationStartDate = subMonths(expiryDate, 2);
+        const daysLeft = differenceInCalendarDays(expiryDate, today);
+        const warnDays = 60; // used only for UI metadata
         rows.push({
           id: `${r.id}-owwa`,
           entityType: "CrewDocument",
           name,
           document: "OWWA RENEWAL",
-          startDate: r.owwaRenewalDate,
+          startDate: r.owwaStartDate ?? r.owwaRenewalDate,
           expiryDate,
           daysLeft,
           warnDays,
           urgency: getUrgency(daysLeft),
+          shouldShow: !isBefore(today, notificationStartDate),
         });
       }
 
       if (r.dateProcessed) {
-        const expiryDate = new Date(
-          r.dateProcessed.getFullYear(),
-          r.dateProcessed.getMonth() + 2,
-          r.dateProcessed.getDate()
-        );
-        const daysLeft = getDaysLeft(expiryDate);
-        const warnDays = 30;
+        // OEC: expires after 2 months, but alert starts 2 weeks before expiry.
+        const expiryDate = startOfDay(addMonths(r.dateProcessed, 2));
+        const notificationStartDate = subWeeks(expiryDate, 2);
+        const daysLeft = differenceInCalendarDays(expiryDate, today);
+        const warnDays = 14; // 2 weeks
         rows.push({
           id: `${r.id}-oec`,
           entityType: "CrewDocument",
@@ -136,13 +133,14 @@ export async function getExpiringAlerts() {
           daysLeft,
           warnDays,
           urgency: getUrgency(daysLeft),
+          shouldShow: !isBefore(today, notificationStartDate),
         });
       }
 
       return rows;
     })
-    // Expiry tracker should only show documents that are about to expire (not already expired).
-    .filter((a) => a.daysLeft >= 0 && a.daysLeft <= a.warnDays)
+    // Show EXPIRING (in notification window) and EXPIRED.
+    .filter((a) => a.shouldShow)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
   return alerts;
