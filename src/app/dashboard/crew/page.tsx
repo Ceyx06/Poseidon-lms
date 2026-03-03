@@ -91,11 +91,20 @@ function normalizeDate(v: string): string {
   const raw = v.trim();
   if (!raw) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const sl = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (sl) {
-    const d1 = Number(sl[1]), d2 = Number(sl[2]), y = Number(sl[3].length === 2 ? `20${sl[3]}` : sl[3]);
-    if (!isNaN(d1) && !isNaN(d2) && !isNaN(y)) return `${y}-${String(d2).padStart(2, "0")}-${String(d1).padStart(2, "0")}`;
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slash) {
+    const d1 = Number(slash[1]);
+    const d2 = Number(slash[2]);
+    const y = Number(slash[3].length === 2 ? `20${slash[3]}` : slash[3]);
+    if (!Number.isNaN(d1) && !Number.isNaN(d2) && !Number.isNaN(y)) {
+      // Prefer dd/mm/yyyy display style from user requirement.
+      const day = String(d1).padStart(2, "0");
+      const month = String(d2).padStart(2, "0"); afa
+      return `${y}-${month}-${day}`;
+    }
   }
+
   const dt = new Date(raw);
   return isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
 }
@@ -795,3 +804,5 @@ export default function CrewDocumentsPage() {
 
 
 
+
+//m

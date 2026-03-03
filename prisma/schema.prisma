@@ -28,6 +28,7 @@ enum Role {
   COORDINATOR
   MANAGER
   STAFF
+  COORDINATOR
 }
 
 // ─── Core Maritime Entities ──────────────────────────────────────────────────
