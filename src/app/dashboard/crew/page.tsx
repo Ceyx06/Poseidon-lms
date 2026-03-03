@@ -67,6 +67,96 @@ type AlertItem = {
   documents: AlertDocument[];
 };
 
+type RowAlertStatus = "EXPIRED" | "EXPIRING" | "NOT_YET";
+
+function getRowUrgencyMeta(data: CrewForm): { status: RowAlertStatus; daysOverdue: number; daysLeft: number } {
+  const docs: Array<{ daysLeft: number; warnDays: number }> = [];
+
+  for (const rule of EXPIRY_RULES) {
+    const startDate = data[rule.key] as string;
+    if (!startDate) continue;
+    const expiryDate = addMonths(startDate, rule.addMonths);
+    if (!expiryDate) continue;
+    docs.push({ daysLeft: daysUntil(expiryDate), warnDays: rule.warnDays });
+  }
+
+  if (!docs.length) return { status: "NOT_YET", daysOverdue: 0, daysLeft: Number.POSITIVE_INFINITY };
+
+  const expired = docs.filter((d) => d.daysLeft < 0);
+  if (expired.length) {
+    return {
+      status: "EXPIRED",
+      daysOverdue: Math.max(...expired.map((d) => Math.abs(d.daysLeft))),
+      daysLeft: Math.min(...expired.map((d) => d.daysLeft)),
+    };
+  }
+
+  const expiring = docs.filter((d) => d.daysLeft <= d.warnDays);
+  if (expiring.length) {
+    return {
+      status: "EXPIRING",
+      daysOverdue: 0,
+      daysLeft: Math.min(...expiring.map((d) => d.daysLeft)),
+    };
+  }
+
+  return {
+    status: "NOT_YET",
+    daysOverdue: 0,
+    daysLeft: Math.min(...docs.map((d) => d.daysLeft)),
+  };
+}
+
+function compareRowsByUrgency(a: RowData, b: RowData): number {
+  const statusRank: Record<RowAlertStatus, number> = {
+    EXPIRED: 0,
+    EXPIRING: 1,
+    NOT_YET: 2,
+  };
+
+  const aMeta = getRowUrgencyMeta(a.data);
+  const bMeta = getRowUrgencyMeta(b.data);
+
+  const rankDiff = statusRank[aMeta.status] - statusRank[bMeta.status];
+  if (rankDiff !== 0) return rankDiff;
+
+  if (aMeta.status === "EXPIRED") {
+    const overdueDiff = bMeta.daysOverdue - aMeta.daysOverdue;
+    if (overdueDiff !== 0) return overdueDiff;
+  } else {
+    const daysLeftDiff = aMeta.daysLeft - bMeta.daysLeft;
+    if (daysLeftDiff !== 0) return daysLeftDiff;
+  }
+
+  return (a.data.crewName || "").localeCompare(b.data.crewName || "");
+}
+
+function sortRowsByUrgency(rows: RowData[]): RowData[] {
+  return [...rows].sort(compareRowsByUrgency);
+}
+
+function compareAlertUrgency(a: AlertItem, b: AlertItem): number {
+  const aExpired = a.daysLeft < 0;
+  const bExpired = b.daysLeft < 0;
+
+  // 1) EXPIRED first, then EXPIRING.
+  if (aExpired !== bExpired) return aExpired ? -1 : 1;
+
+  if (aExpired && bExpired) {
+    // 2A) EXPIRED: most overdue first.
+    const aDaysOverdue = Math.abs(a.daysLeft);
+    const bDaysOverdue = Math.abs(b.daysLeft);
+    const overdueDiff = bDaysOverdue - aDaysOverdue;
+    if (overdueDiff !== 0) return overdueDiff;
+  } else {
+    // 2B) EXPIRING: closest to expiry first.
+    const daysLeftDiff = a.daysLeft - b.daysLeft;
+    if (daysLeftDiff !== 0) return daysLeftDiff;
+  }
+
+  return a.crewName.localeCompare(b.crewName);
+}
+
 const STATUS_OPTIONS = ["DIS-EMBARKATION", "EMBARKATION"];
 
 const COLUMNS: Column[] = [
@@ -100,7 +190,7 @@ function normalizeDate(v: string): string {
     if (!Number.isNaN(d1) && !Number.isNaN(d2) && !Number.isNaN(y)) {
       // Prefer dd/mm/yyyy display style from user requirement.
       const day = String(d1).padStart(2, "0");
-      const month = String(d2).padStart(2, "0"); afa
+      const month = String(d2).padStart(2, "0");
       return `${y}-${month}-${day}`;
     }
   }
@@ -310,6 +400,13 @@ export default function CrewDocumentsPage() {
   const rollbackRef = useRef<Map<string, CrewForm>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function setRowsOrdered(next: RowData[] | ((prev: RowData[]) => RowData[])) {
+    setRows((prev) => {
+      const resolved = typeof next === "function" ? (next as (prevRows: RowData[]) => RowData[])(prev) : next;
+      return sortRowsByUrgency(resolved);
+    });
+  }
+
   // Render only existing rows; keep 1 empty visual row when list is empty.
   const visual = useMemo(() => Math.max(rows.length, 1), [rows.length]);
   const ck = (r: number, c: number) => `${r}:${c}`;
@@ -353,8 +450,8 @@ export default function CrewDocumentsPage() {
       };
     });
 
-    // Sort: expired first, then by most urgent upcoming.
-    return result.sort((a, b) => a.daysLeft - b.daysLeft);
+    // Sort using strict urgency rules.
+    return result.sort(compareAlertUrgency);
   }, [rows]);
 
   // Reset dismissed state when new alerts appear
@@ -393,7 +490,7 @@ export default function CrewDocumentsPage() {
       const res = await fetch("/api/crew-documents", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load");
-      setRows((data.rows ?? []).map(fromApiRow));
+      setRowsOrdered((data.rows ?? []).map(fromApiRow));
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -412,7 +509,7 @@ export default function CrewDocumentsPage() {
         const res = await fetch("/api/crew-documents/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates }) });
         if (!res.ok) throw new Error("Save failed");
       } catch {
-        setRows(prev => prev.map(r => { const o = snap.get(r.id); return o ? { ...r, data: o } : r; }));
+        setRowsOrdered(prev => prev.map(r => { const o = snap.get(r.id); return o ? { ...r, data: o } : r; }));
       }
     }, 300);
   }
@@ -432,7 +529,12 @@ export default function CrewDocumentsPage() {
     try {
       const created = await createRow(EMPTY_FORM);
       if (!created) return;
-      setRows(prev => { const next = [...prev, created]; requestAnimationFrame(() => focusCell({ row: next.length - 1, col: 0 })); return next; });
+      setRows(prev => {
+        const ordered = sortRowsByUrgency([...prev, created]);
+        const row = ordered.findIndex((r) => r.id === created.id);
+        requestAnimationFrame(() => focusCell({ row: row >= 0 ? row : 0, col: 0 }));
+        return ordered;
+      });
     } finally { setAddingRow(false); }
   }
 
@@ -441,11 +543,11 @@ export default function CrewDocumentsPage() {
     if (!window.confirm("Delete selected row?")) return;
     const idx = selected.row, id = rows[idx].id, prev = rows;
     setDeletingRow(true); setError(null);
-    setRows(r => r.filter((_, i) => i !== idx)); setSelected(null); setEditing(null);
+    setRowsOrdered(r => r.filter((_, i) => i !== idx)); setSelected(null); setEditing(null);
     try {
       const res = await fetch(`/api/crew-documents/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-    } catch (e: any) { setRows(prev); setError(e.message); }
+    } catch (e: any) { setRowsOrdered(prev); setError(e.message); }
     finally { setDeletingRow(false); }
   }
 
@@ -461,7 +563,7 @@ export default function CrewDocumentsPage() {
     if (changed && row < src.length) {
       const id = src[row].id, prevRow = src[row].data;
       const upd = { ...prevRow, [column.key]: norm };
-      setRows(p => p.map((r, i) => i === row ? { ...r, data: upd } : r));
+      setRowsOrdered(p => p.map((r, i) => i === row ? { ...r, data: upd } : r));
       queueSave(id, upd, prevRow);
     }
     if (next) focusCell(next);
@@ -476,11 +578,12 @@ export default function CrewDocumentsPage() {
         const created = await createRow(EMPTY_FORM);
         if (!created) return;
         setRows(prev => {
-          const next = [...prev, created];
+          const ordered = sortRowsByUrgency([...prev, created]);
+          const newRowIndex = ordered.findIndex((r) => r.id === created.id);
           const cur = created.data[column.key] ?? "";
-          setSelected({ row: next.length - 1, col });
-          setEditing({ row: next.length - 1, col, value: seed ?? cur, original: cur });
-          return next;
+          setSelected({ row: newRowIndex, col });
+          setEditing({ row: newRowIndex, col, value: seed ?? cur, original: cur });
+          return ordered;
         });
       } finally { creatingRef.current = false; }
       return;
@@ -509,11 +612,11 @@ export default function CrewDocumentsPage() {
         updates.set(updated[tr].id, updated[tr].data);
       }
     }
-    setRows(updated);
+    setRowsOrdered(updated);
     try {
       const res = await fetch("/api/crew-documents/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates: Array.from(updates.entries()).map(([id, data]) => ({ id, data: toApi(data) })) }) });
       if (!res.ok) throw new Error("Paste failed");
-    } catch { setRows(before); setError("Paste failed. Changes rolled back."); }
+    } catch { setRowsOrdered(before); setError("Paste failed. Changes rolled back."); }
   }
 
   const canDelete = !!selected && selected.row < rows.length && !deletingRow;
@@ -717,7 +820,7 @@ export default function CrewDocumentsPage() {
                               if (e.key.startsWith("Arrow")) { e.preventDefault(); focusCell(move({ row: r, col: cIdx }, e.key.replace("Arrow", "").toLowerCase() as any)); return; }
                               if (e.key === "Backspace" || e.key === "Delete") {
                                 e.preventDefault();
-                                if (r < rows.length) { const id = rows[r].id, prev = rows[r].data, upd = { ...prev, [col.key]: "" }; setRows(p => p.map((x, i) => i === r ? { ...x, data: upd } : x)); queueSave(id, upd, prev); }
+                                if (r < rows.length) { const id = rows[r].id, prev = rows[r].data, upd = { ...prev, [col.key]: "" }; setRowsOrdered(p => p.map((x, i) => i === r ? { ...x, data: upd } : x)); queueSave(id, upd, prev); }
                                 return;
                               }
                               if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); startEdit(r, cIdx, e.key); }
@@ -728,7 +831,7 @@ export default function CrewDocumentsPage() {
                                 <select className="cs" autoFocus value={editing.value}
                                   onChange={e => {
                                     const v = e.target.value;
-                                    if (r < rows.length) { const id = rows[r].id, prev = rows[r].data, upd = { ...prev, [col.key]: v }; setRows(p => p.map((x, i) => i === r ? { ...x, data: upd } : x)); queueSave(id, upd, prev); }
+                                    if (r < rows.length) { const id = rows[r].id, prev = rows[r].data, upd = { ...prev, [col.key]: v }; setRowsOrdered(p => p.map((x, i) => i === r ? { ...x, data: upd } : x)); queueSave(id, upd, prev); }
                                     setEditing(null); requestAnimationFrame(() => focusCell({ row: r, col: cIdx }));
                                   }}
                                   onBlur={() => commitEdit()}

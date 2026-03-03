@@ -130,20 +130,7 @@ export default async function DashboardPage() {
         <p style={{ fontSize: 13, color: "#64748b" }}>
           Crew document compliance · OWWA (2-year) and OEC (2-month) expiry tracking
         </p>
-        <div style={{ marginTop: 14 }}>
-          <Link href="/dashboard/crew" style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            textDecoration: "none", fontSize: 12, fontWeight: 600,
-            color: "#fff", background: "#2563eb",
-            padding: "8px 14px", borderRadius: 9,
-            boxShadow: "0 1px 5px rgba(37,99,235,.3)",
-          }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Open Crew Documents
-          </Link>
-        </div>
+
       </div>
 
       {/* ── Urgent banner ─────────────────────────────────────────────────── */}

@@ -81,6 +81,12 @@ export async function getExpiringAlerts() {
 
   const records = await listCrewDocuments();
 
+  type AlertStatus = "EXPIRED" | "EXPIRING";
+  const statusRank: Record<AlertStatus, number> = {
+    EXPIRED: 0,
+    EXPIRING: 1,
+  };
+
   const alerts = records
     .flatMap((r) => {
       const name = r.crewName?.trim() || "Unnamed";
@@ -94,6 +100,7 @@ export async function getExpiringAlerts() {
         daysLeft: number;
         warnDays: number;
         urgency: ReturnType<typeof getUrgency>;
+        status: AlertStatus;
         shouldShow: boolean;
       }> = [];
 
@@ -113,6 +120,7 @@ export async function getExpiringAlerts() {
           daysLeft,
           warnDays,
           urgency: getUrgency(daysLeft),
+          status: daysLeft < 0 ? "EXPIRED" : "EXPIRING",
           shouldShow: !isBefore(today, notificationStartDate),
         });
       }
@@ -133,15 +141,34 @@ export async function getExpiringAlerts() {
           daysLeft,
           warnDays,
           urgency: getUrgency(daysLeft),
+          status: daysLeft < 0 ? "EXPIRED" : "EXPIRING",
           shouldShow: !isBefore(today, notificationStartDate),
         });
       }
 
       return rows;
     })
-    // Show EXPIRING (in notification window) and EXPIRED.
+    // Show EXPIRED and in-window EXPIRING alerts only.
     .filter((a) => a.shouldShow)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+    .sort((a, b) => {
+      // 1) EXPIRED first, 2) then EXPIRING.
+      const rankDiff = statusRank[a.status] - statusRank[b.status];
+      if (rankDiff !== 0) return rankDiff;
+
+      if (a.status === "EXPIRED") {
+        // Within EXPIRED: most overdue first.
+        const aDaysOverdue = Math.abs(a.daysLeft);
+        const bDaysOverdue = Math.abs(b.daysLeft);
+        const overdueDiff = bDaysOverdue - aDaysOverdue;
+        if (overdueDiff !== 0) return overdueDiff;
+      } else {
+        // Within EXPIRING: closest expiry first.
+        const daysLeftDiff = a.daysLeft - b.daysLeft;
+        if (daysLeftDiff !== 0) return daysLeftDiff;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
 
   return alerts;
 }
