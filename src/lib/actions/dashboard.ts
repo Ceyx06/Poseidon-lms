@@ -83,23 +83,66 @@ export async function getExpiringAlerts() {
   const records = await listCrewDocuments();
 
   const alerts = records
-    .map((r) => {
-      const expiryDate = computeCrewExpiryDate(r);
-      if (!expiryDate) return null;
-      const daysLeft = getDaysLeft(expiryDate);
+    .flatMap((r) => {
+      const name = r.crewName?.trim() || "Unnamed";
+      const rows: Array<{
+        id: string;
+        entityType: "CrewDocument";
+        name: string;
+        document: "OWWA RENEWAL" | "OEC";
+        startDate: Date;
+        expiryDate: Date;
+        daysLeft: number;
+        warnDays: number;
+        urgency: ReturnType<typeof getUrgency>;
+      }> = [];
 
-      return {
-        id: r.id,
-        entityType: "CrewDocument" as const,
-        name: r.crewName,
-        owner: r.vessel ?? r.principal ?? "-",
-        expiryDate,
-        daysLeft,
-        urgency: getUrgency(daysLeft),
-      };
+      if (r.owwaRenewalDate) {
+        const expiryDate = new Date(
+          r.owwaRenewalDate.getFullYear() + 2,
+          r.owwaRenewalDate.getMonth(),
+          r.owwaRenewalDate.getDate()
+        );
+        const daysLeft = getDaysLeft(expiryDate);
+        const warnDays = 60;
+        rows.push({
+          id: `${r.id}-owwa`,
+          entityType: "CrewDocument",
+          name,
+          document: "OWWA RENEWAL",
+          startDate: r.owwaRenewalDate,
+          expiryDate,
+          daysLeft,
+          warnDays,
+          urgency: getUrgency(daysLeft),
+        });
+      }
+
+      if (r.dateProcessed) {
+        const expiryDate = new Date(
+          r.dateProcessed.getFullYear(),
+          r.dateProcessed.getMonth() + 2,
+          r.dateProcessed.getDate()
+        );
+        const daysLeft = getDaysLeft(expiryDate);
+        const warnDays = 30;
+        rows.push({
+          id: `${r.id}-oec`,
+          entityType: "CrewDocument",
+          name,
+          document: "OEC",
+          startDate: r.dateProcessed,
+          expiryDate,
+          daysLeft,
+          warnDays,
+          urgency: getUrgency(daysLeft),
+        });
+      }
+
+      return rows;
     })
-    .filter((a): a is NonNullable<typeof a> => a !== null)
-    .filter((a) => a.expiryDate <= in90Days)
+    // Expiry tracker should only show documents that are about to expire (not already expired).
+    .filter((a) => a.daysLeft >= 0 && a.daysLeft <= a.warnDays)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
   return alerts;
