@@ -242,3 +242,18 @@ model OWWARecord {
   @@index([owwaStartDate])
   @@index([owwaRenewalDate])
 }
+
+
+model CoordinatorFile {
+  id         String   @id @default(cuid())
+  crewName   String
+  crewKey    String
+  fileName   String
+  fileUrl    String
+  fileSize   String
+  publicId   String?
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([crewKey])
+}
