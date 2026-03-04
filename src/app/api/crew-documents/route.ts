@@ -48,8 +48,9 @@ function parsePayload(input: CrewDocumentInput): CrewDocumentPayload {
   };
 }
 
-function isAdmin(session: any) {
-  return (session?.user as any)?.role === "ADMIN";
+function hasAdminOrCoordinatorAccess(session: any) {
+  const role = (session?.user as any)?.role;
+  return role === "ADMIN" || role === "COORDINATOR";
 }
 
 export async function GET() {
@@ -63,7 +64,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasAdminOrCoordinatorAccess(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = (await req.json()) as CrewDocumentInput;
   const payload = parsePayload(body);

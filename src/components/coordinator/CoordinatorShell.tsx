@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: "/coordinator/dashboard/metrobank",      label: "Metrobank Referral",  icon: "🏦" },
   { href: "/coordinator/dashboard/panstar-dep",    label: "PANSTAR Departures",  icon: "🚢" },
   { href: "/coordinator/dashboard/panstar-con",    label: "PANSTAR Contracts",   icon: "📋" },
-  { href: "/coordinator/dashboard/eregistration",  label: "E-Registration",      icon: "🔐" },
+  { href: "/coordinator/dashboard/eregistration",  label: "Account Email & Password",      icon: "🔐" },
 ];
 
 export default function CoordinatorShell({ children, user }: {
@@ -91,7 +91,11 @@ export default function CoordinatorShell({ children, user }: {
               <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b8a4" }} />
               <span style={{ fontSize: "11px", color: "#0d8a7a" }}>Live</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Link
+              href="/coordinator/dashboard/security"
+              title="Open Security Settings"
+              style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}
+            >
               <div style={{ textAlign: "right" }}>
                 <p style={{ fontSize: "13px", fontWeight: 500, color: "#1a2d45" }}>{user?.name}</p>
                 <p style={{ fontSize: "11px", color: "#a0b0c0" }}>{user?.email}</p>
@@ -99,7 +103,7 @@ export default function CoordinatorShell({ children, user }: {
               <div style={{ width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,184,164,0.12)", border: "1.5px solid rgba(16,184,164,0.3)", fontSize: "14px", fontWeight: "bold", color: "#0d8a7a" }}>
                 {user?.name?.[0]?.toUpperCase() ?? "C"}
               </div>
-            </div>
+            </Link>
             <button onClick={() => signOut({ callbackUrl: "/login" })}
               style={{ fontSize: "12px", color: "#a0b0c0", cursor: "pointer", padding: "6px 12px", borderRadius: "8px", border: "1px solid #e8eef5", background: "transparent" }}>
               Sign out
@@ -114,3 +118,4 @@ export default function CoordinatorShell({ children, user }: {
     </div>
   );
 }
+

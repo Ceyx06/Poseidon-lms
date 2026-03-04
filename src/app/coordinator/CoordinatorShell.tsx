@@ -5,15 +5,15 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 
 const NAV_ITEMS = [
-  { href: "/coordinator/dashboard",                label: "Dashboard",           icon: "📊" },
-  { href: "/coordinator/dashboard/crew",           label: "Crew Documents",      icon: "📁" },
-  { href: "/coordinator/dashboard/sea-service",    label: "Sea Service Records", icon: "⚓" },
-  { href: "/coordinator/dashboard/employment",     label: "Employment Certs",    icon: "📜" },
-  { href: "/coordinator/dashboard/resumes",        label: "JM Global Resumes",   icon: "👤" },
-  { href: "/coordinator/dashboard/metrobank",      label: "Metrobank Referral",  icon: "🏦" },
-  { href: "/coordinator/dashboard/panstar-dep",    label: "PANSTAR Departures",  icon: "🚢" },
-  { href: "/coordinator/dashboard/panstar-con",    label: "PANSTAR Contracts",   icon: "📋" },
-  { href: "/coordinator/dashboard/eregistration",  label: "E-Registration",      icon: "🔐" },
+  { href: "/coordinator/dashboard", label: "Dashboard", icon: "📊" },
+  { href: "/coordinator/dashboard/crew", label: "Crew Documents", icon: "📁" },
+  { href: "/coordinator/dashboard/sea-service", label: "Sea Service Records", icon: "⚓" },
+  { href: "/coordinator/dashboard/employment", label: "Employment Certs", icon: "📜" },
+  { href: "/coordinator/dashboard/resumes", label: "JM Global Resumes", icon: "👤" },
+  { href: "/coordinator/dashboard/metrobank", label: "Metrobank Referral", icon: "🏦" },
+  { href: "/coordinator/dashboard/panstar-dep", label: "PANSTAR Departures", icon: "🚢" },
+  { href: "/coordinator/dashboard/panstar-con", label: "PANSTAR Contracts", icon: "📋" },
+  { href: "/coordinator/dashboard/eregistration", label: "E-Registration", icon: "🔐" },
 ];
 
 export default function CoordinatorShell({ children, user }: {

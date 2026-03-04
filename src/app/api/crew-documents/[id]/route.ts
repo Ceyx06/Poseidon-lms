@@ -48,14 +48,15 @@ function parsePayload(input: CrewDocumentInput): CrewDocumentPayload {
   };
 }
 
-function isAdmin(session: any) {
-  return (session?.user as any)?.role === "ADMIN";
+function hasAdminOrCoordinatorAccess(session: any) {
+  const role = (session?.user as any)?.role;
+  return role === "ADMIN" || role === "COORDINATOR";
 }
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasAdminOrCoordinatorAccess(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await context.params;
 
   const body = (await req.json()) as CrewDocumentInput;
@@ -68,7 +69,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasAdminOrCoordinatorAccess(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await context.params;
 
   await deleteCrewDocument(id);
