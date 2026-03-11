@@ -8,40 +8,21 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
     try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
+        const body = await req.text();
+        if (!body) return NextResponse.json({ error: "Empty body" }, { status: 400 });
 
-        if (!file) {
-            return NextResponse.json({ error: "No file provided" }, { status: 400 });
-        }
-
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
-        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        const { publicId } = JSON.parse(body);
+        if (!publicId) return NextResponse.json({ error: "Missing publicId" }, { status: 400 });
 
         const { error } = await supabase.storage
             .from("Poseidon-files")
-            .upload(fileName, buffer, {
-                contentType: file.type,
-                upsert: false,
-            });
+            .remove([publicId]);
 
         if (error) throw error;
 
-        const { data: publicData } = supabase.storage
-            .from("Poseidon-files")
-            .getPublicUrl(fileName);
-
-        return NextResponse.json({
-            url: publicData.publicUrl,
-            publicId: fileName,
-            size: file.size,
-            name: file.name,
-        });
-
+        return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Upload error:", error);
-        return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+        console.error("Delete error:", error);
+        return NextResponse.json({ error: "Delete failed" }, { status: 500 });
     }
 }

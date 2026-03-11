@@ -122,9 +122,9 @@ export default function PanstarContractPage() {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "24px" }}>
         {[
-          { label: "Total Contracts", value: records.length,                                                         color: "#c0600a", bg: "#fff8f0" },
-          { label: "PDF Files",       value: records.filter(r => r.fileName.endsWith(".pdf")).length,                color: "#8b5cf6", bg: "#f5f0ff" },
-          { label: "Image Files",     value: records.filter(r => r.fileName.match(/\.(jpg|jpeg|png)$/i)).length,     color: "#1a6bbf", bg: "#eef4ff" },
+          { label: "Total Contracts", value: records.length, color: "#c0600a", bg: "#fff8f0" },
+          { label: "PDF Files", value: records.filter(r => r.fileName.endsWith(".pdf")).length, color: "#8b5cf6", bg: "#f5f0ff" },
+          { label: "Image Files", value: records.filter(r => r.fileName.match(/\.(jpg|jpeg|png)$/i)).length, color: "#1a6bbf", bg: "#eef4ff" },
         ].map((s) => (
           <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}25`, borderRadius: "14px", padding: "16px" }}>
             <div style={{ fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "26px", color: s.color }}>{s.value}</div>
