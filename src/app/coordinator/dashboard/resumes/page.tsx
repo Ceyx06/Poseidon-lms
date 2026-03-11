@@ -49,7 +49,18 @@ export default function ResumesPage() {
     try {
       const res = await fetch("/api/resumes");
       const data = await res.json();
-      if (data.resumes) setRecords(data.resumes);
+      if (data.resumes) {
+        const mapped = data.resumes.map((r: any) => ({
+          id: r.id,
+          crew_name: r.crewName ?? r.crew_name ?? "",
+          file_name: r.fileName ?? r.file_name ?? "",
+          file_url: r.fileUrl ?? r.file_url ?? "",
+          file_size: r.fileSize ?? r.file_size ?? "",
+          public_id: r.publicId ?? r.public_id ?? "",
+          uploaded_at: r.uploadedAt ?? r.uploaded_at ?? r.createdAt ?? new Date().toISOString(),
+        }));
+        setRecords(mapped);
+      }
     } catch (error) {
       console.error("Failed to fetch resumes:", error);
     } finally {
@@ -70,7 +81,6 @@ export default function ResumesPage() {
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || "Upload failed.");
 
-      // Save to database
       const saveRes = await fetch("/api/resumes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +95,17 @@ export default function ResumesPage() {
       const saveData = await saveRes.json();
       if (!saveRes.ok) throw new Error(saveData.error || "Save failed.");
 
-      setRecords((prev) => [saveData.resume, ...prev]);
+      const newRecord: Resume = {
+        id: saveData.resume.id,
+        crew_name: saveData.resume.crewName ?? saveData.resume.crew_name ?? crewName.trim(),
+        file_name: saveData.resume.fileName ?? saveData.resume.file_name ?? selectedFile.name,
+        file_url: saveData.resume.fileUrl ?? saveData.resume.file_url ?? data.url,
+        file_size: saveData.resume.fileSize ?? saveData.resume.file_size ?? formatFileSize(selectedFile.size),
+        public_id: saveData.resume.publicId ?? saveData.resume.public_id ?? data.publicId,
+        uploaded_at: saveData.resume.uploadedAt ?? saveData.resume.uploaded_at ?? new Date().toISOString(),
+      };
+
+      setRecords((prev) => [newRecord, ...prev]);
       setCrewName("");
       setSelectedFile(null);
       const input = document.getElementById("resumeFile") as HTMLInputElement;
@@ -115,8 +135,8 @@ export default function ResumesPage() {
   }
 
   const filtered = records.filter((r) =>
-    r.crew_name.toLowerCase().includes(search.toLowerCase()) ||
-    r.file_name.toLowerCase().includes(search.toLowerCase())
+    (r.crew_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (r.file_name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -177,8 +197,8 @@ export default function ResumesPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
         {[
           { label: "Total Resumes", value: records.length, color: "#c9972a", bg: "#fdfbea" },
-          { label: "PDF Files", value: records.filter(r => /\.pdf$/i.test(r.file_name)).length, color: "#c0392b", bg: "#fff5f5" },
-          { label: "Other Files", value: records.filter(r => !/\.pdf$/i.test(r.file_name)).length, color: "#1a6bbf", bg: "#eef4ff" },
+          { label: "PDF Files", value: records.filter(r => /\.pdf$/i.test(r.file_name ?? "")).length, color: "#c0392b", bg: "#fff5f5" },
+          { label: "Other Files", value: records.filter(r => !/\.pdf$/i.test(r.file_name ?? "")).length, color: "#1a6bbf", bg: "#eef4ff" },
         ].map((s) => (
           <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}25`, borderRadius: "14px", padding: "16px" }}>
             <div style={{ fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "26px", color: s.color }}>{s.value}</div>
@@ -219,7 +239,7 @@ export default function ResumesPage() {
               <tbody>
                 {filtered.map((r, i) => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f0f4f8", background: i % 2 === 0 ? "#ffffff" : "#fafbfd" }}>
-                    <td style={{ padding: "12px 14px", fontSize: "22px" }}>{getFileIcon(r.file_name)}</td>
+                    <td style={{ padding: "12px 14px", fontSize: "22px" }}>{getFileIcon(r.file_name ?? "")}</td>
                     <td style={{ padding: "12px 14px", fontWeight: "500", color: "#1a2d45", whiteSpace: "nowrap" }}>{r.crew_name}</td>
                     <td style={{ padding: "12px 14px", color: "#6a85a0", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.file_name}</td>
                     <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.file_size}</td>
@@ -228,7 +248,7 @@ export default function ResumesPage() {
                     </td>
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: "flex", gap: "6px" }}>
-                        <a href={getViewUrl(r.file_name, r.file_url)} target="_blank" rel="noreferrer"
+                        <a href={getViewUrl(r.file_name ?? "", r.file_url ?? "")} target="_blank" rel="noreferrer"
                           style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
                           📎 View
                         </a>
