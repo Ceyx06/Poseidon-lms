@@ -1,39 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
-);
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = params;
+        const { id } = await context.params;
 
-        // Get the record first to get publicId
-        const { data: record } = await supabase
-            .from("crew_documents")
-            .select("public_id")
-            .eq("id", id)
-            .single();
+        const record = await prisma.coordinatorFile.findUnique({
+            where: { id },
+        });
 
-        // Delete file from Supabase Storage
-        if (record?.public_id) {
-            await supabase.storage
-                .from("Poseidon-files")
-                .remove([record.public_id]);
+        if (record?.publicId) {
+            try {
+                const { createClient } = await import("@supabase/supabase-js");
+                const supabase = createClient(
+                    process.env.SUPABASE_URL!,
+                    process.env.SUPABASE_SERVICE_KEY!
+                );
+                await supabase.storage
+                    .from("Poseidon-files")
+                    .remove([record.publicId]);
+            } catch {
+                // ignore storage delete errors
+            }
         }
 
-        // Delete from database
-        const { error } = await supabase
-            .from("crew_documents")
-            .delete()
-            .eq("id", id);
-
-        if (error) throw error;
+        await prisma.coordinatorFile.delete({ where: { id } });
 
         return NextResponse.json({ success: true });
     } catch (error) {
