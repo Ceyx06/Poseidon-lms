@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 
 export default function SecurityPage() {
   const [loading, setLoading] = useState(true);
-  const [savingName, setSavingName] = useState(false);
+  const [savingAccount, setSavingAccount] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -37,26 +37,30 @@ export default function SecurityPage() {
     loadProfile();
   }, []);
 
-  async function saveName() {
+  async function saveAccount() {
     if (!name.trim()) {
       toast.error("Username is required");
       return;
     }
-    setSavingName(true);
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    setSavingAccount(true);
     try {
       const res = await fetch("/api/account/security", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to update username");
-      toast.success("Username updated");
+      if (!res.ok) throw new Error(data?.error || "Failed to update account info");
+      toast.success("Account info updated");
       await loadProfile();
     } catch (e: any) {
-      toast.error(e.message || "Failed to update username");
+      toast.error(e.message || "Failed to update account info");
     } finally {
-      setSavingName(false);
+      setSavingAccount(false);
     }
   }
 
@@ -204,16 +208,16 @@ export default function SecurityPage() {
               <div>
                 <label style={{ display: "block", fontSize: 11, color: "#64748b", marginBottom: 6 }}>Email</label>
                 <input
+                  type="email"
                   value={email}
-                  disabled
+                  onChange={(e) => setEmail(e.target.value)}
                   style={{
                     width: "100%",
-                    border: "1px solid #e2e8f0",
+                    border: "1px solid #d7e1ec",
                     borderRadius: 10,
                     padding: "10px 12px",
                     fontSize: 13,
-                    background: "#f8fafc",
-                    color: "#64748b",
+                    color: "#1a2d45",
                   }}
                 />
               </div>
@@ -221,8 +225,8 @@ export default function SecurityPage() {
             <div style={{ marginTop: 12 }}>
               <button
                 type="button"
-                onClick={saveName}
-                disabled={savingName}
+                onClick={saveAccount}
+                disabled={savingAccount}
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
@@ -231,10 +235,10 @@ export default function SecurityPage() {
                   border: "none",
                   borderRadius: 8,
                   padding: "9px 14px",
-                  cursor: savingName ? "not-allowed" : "pointer",
+                  cursor: savingAccount ? "not-allowed" : "pointer",
                 }}
               >
-                {savingName ? "Saving..." : "Save Username"}
+                {savingAccount ? "Saving..." : "Save Account Info"}
               </button>
             </div>
           </section>
@@ -315,4 +319,3 @@ export default function SecurityPage() {
     </div>
   );
 }
-

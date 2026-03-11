@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type RootFolder = {
   name: string;
@@ -15,6 +15,7 @@ type FileItem = {
   uploadedAt: string;
   sizeLabel: string;
   url: string;
+  mimeType: string;
 };
 
 type FolderNode = {
@@ -23,6 +24,8 @@ type FolderNode = {
   folders: FolderNode[];
   files: FileItem[];
 };
+
+const STORAGE_KEY = "panstar-con-state-v1";
 
 const rootFolders: RootFolder[] = [
   {
@@ -53,6 +56,38 @@ function formatFileSize(bytes: number) {
 
 function createFolderNode(name: string): FolderNode {
   return { id: crypto.randomUUID(), name, folders: [], files: [] };
+}
+
+function canPreview(mime: string) {
+  return (
+    mime.startsWith("application/pdf") ||
+    mime.startsWith("image/") ||
+    mime.startsWith("text/")
+  );
+}
+
+function isOfficeDoc(fileName: string, mime: string) {
+  const lower = fileName.toLowerCase();
+  return (
+    mime.includes("word") ||
+    mime.includes("excel") ||
+    mime.includes("powerpoint") ||
+    lower.endsWith(".doc") ||
+    lower.endsWith(".docx") ||
+    lower.endsWith(".xls") ||
+    lower.endsWith(".xlsx") ||
+    lower.endsWith(".ppt") ||
+    lower.endsWith(".pptx")
+  );
+}
+
+async function uploadFileToCloud(file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/upload", { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Upload failed");
+  const data = await res.json();
+  return data as { url: string; size: number; name: string };
 }
 
 function updateNode(
@@ -113,6 +148,44 @@ export default function PanstarContractPage() {
   // Are we inside a subfolder (not the vessel root)?
   const isInsideSubfolder = pathIds.length > 0;
 
+  // Load saved state so folders persist across navigation
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        activeRootName?: string;
+        tree?: FolderNode | null;
+        pathIds?: string[];
+        deletedFolders?: { folder: FolderNode; parentPathIds: string[]; deletedAt: number }[];
+      };
+      const root = rootFolders.find((r) => r.name === parsed.activeRootName) ?? null;
+      setActiveRoot(root);
+      setTree(parsed.tree ?? null);
+      setPathIds(parsed.pathIds ?? []);
+      setDeletedFolders(parsed.deletedFolders ?? []);
+    } catch (err) {
+      console.error("Failed to restore panstar-con state", err);
+    }
+  }, []);
+
+  // Persist state whenever it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!tree || !activeRoot) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const payload = {
+      activeRootName: activeRoot.name,
+      tree,
+      pathIds,
+      deletedFolders,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }, [tree, activeRoot, pathIds, deletedFolders]);
+
   function openRootFolder(root: RootFolder) {
     setActiveRoot(root);
     setTree(createFolderNode(root.name));
@@ -145,7 +218,9 @@ export default function PanstarContractPage() {
       prev
         ? updateNode(prev, path, (target) => ({
           ...target,
-          folders: [createFolderNode(name), ...target.folders],
+          folders: [...target.folders, createFolderNode(name)].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
         }))
         : prev,
     );
@@ -160,31 +235,72 @@ export default function PanstarContractPage() {
     setPathIds((prev) => prev.slice(0, -1));
   }
 
-  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!tree || !e.target.files?.length) return;
 
-    const incoming: FileItem[] = Array.from(e.target.files).map((file) => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      uploadedAt: new Date().toLocaleString("en-PH"),
-      sizeLabel: formatFileSize(file.size),
-      url: URL.createObjectURL(file),
-    }));
+    try {
+      const incoming: FileItem[] = await Promise.all(
+        Array.from(e.target.files).map(async (file) => {
+          const uploaded = await uploadFileToCloud(file);
+          return {
+            id: crypto.randomUUID(),
+            name: file.name,
+            uploadedAt: new Date().toLocaleString("en-PH"),
+            sizeLabel: formatFileSize(uploaded.size ?? file.size),
+            url: uploaded.url,
+            mimeType: file.type || "application/octet-stream",
+          };
+        }),
+      );
 
-    // Use override path if set (row-level upload), else current folder path
-    const path = uploadTargetRef.current ?? [...pathIds];
-    uploadTargetRef.current = null;
+      // Use override path if set (row-level upload), else current folder path
+      const path = uploadTargetRef.current ?? [...pathIds];
+      uploadTargetRef.current = null;
 
-    setTree((prev) =>
-      prev
-        ? updateNode(prev, path, (target) => ({
-          ...target,
-          files: [...incoming, ...target.files],
-        }))
-        : prev,
-    );
+      setTree((prev) =>
+        prev
+          ? updateNode(prev, path, (target) => ({
+            ...target,
+            files: [...target.files, ...incoming].sort((a, b) =>
+              a.name.localeCompare(b.name),
+            ),
+          }))
+          : prev,
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed. Please try again.");
+    } finally {
+      e.target.value = "";
+    }
+  }
 
-    e.target.value = "";
+  function openFile(file: FileItem) {
+    if (canPreview(file.mimeType)) {
+      const win = window.open("", "_blank", "noopener,noreferrer");
+      if (win) {
+        win.document.write(`
+          <html>
+            <head><title>${file.name}</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5">
+              ${
+                file.mimeType.startsWith("image/")
+                  ? `<img src="${file.url}" style="max-width:100%;max-height:100vh;object-fit:contain" />`
+                  : `<embed src="${file.url}" type="${file.mimeType}" style="width:100vw;height:100vh;border:none;" />`
+              }
+            </body>
+          </html>
+        `);
+        win.document.close();
+      }
+    } else if (isOfficeDoc(file.name, file.mimeType)) {
+      const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`;
+      window.open(officeUrl, "_blank", "noopener,noreferrer");
+    } else {
+      alert(
+        "Preview works for PDF, images, and text files. For other types, please download and open in your desktop app.",
+      );
+    }
   }
 
   function deleteFolder(folderId: string) {
@@ -214,7 +330,9 @@ export default function PanstarContractPage() {
       prev
         ? updateNode(prev, entry.parentPathIds, (target) => ({
           ...target,
-          folders: [entry.folder, ...target.folders],
+          folders: [...target.folders, entry.folder].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
         }))
         : prev,
     );
@@ -228,6 +346,19 @@ export default function PanstarContractPage() {
   function uploadIntoFolder(folderPathIds: string[]) {
     uploadTargetRef.current = folderPathIds;
     fileInputRef.current?.click();
+  }
+
+  function deleteFile(fileId: string) {
+    if (!tree) return;
+    const path = [...pathIds];
+    setTree((prev) =>
+      prev
+        ? updateNode(prev, path, (target) => ({
+            ...target,
+            files: target.files.filter((f) => f.id !== fileId),
+          }))
+        : prev,
+    );
   }
 
   if (activeRoot && tree && currentNode) {
@@ -524,7 +655,6 @@ export default function PanstarContractPage() {
                   key={file.id}
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
                     alignItems: "center",
                     gap: "10px",
                     padding: "12px 14px",
@@ -552,22 +682,42 @@ export default function PanstarContractPage() {
                       </p>
                     </div>
                   </div>
-                  <a
-                    href={file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      fontSize: "12px",
-                      color: "#1a6bbf",
-                      textDecoration: "none",
-                      border: "1px solid #d8e0ea",
-                      borderRadius: "8px",
-                      padding: "6px 10px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Open
-                  </a>
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => openFile(file)}
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "#1a6bbf",
+                        background: "#eef4ff",
+                        border: "1px solid #c5d9f5",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteFile(file.id)}
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "#c0392b",
+                        background: "#fff0ee",
+                        border: "1px solid #f5c5c0",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))
             )}

@@ -50,24 +50,44 @@ export async function PATCH(req: Request) {
   if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
   const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
 
-  if (!name && !newPassword) {
+  if (!name && !email && !newPassword) {
     return NextResponse.json({ error: "No updates provided" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { password: true },
+    select: { password: true, email: true },
   });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const data: { name?: string; password?: string } = {};
+  const data: { name?: string; email?: string; password?: string } = {};
 
   if (name) {
     if (name.length < 2) return NextResponse.json({ error: "Username is too short" }, { status: 400 });
     data.name = name;
+  }
+
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+    }
+
+    if (email !== user.email) {
+      const existing = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (existing && existing.id !== userId) {
+        return NextResponse.json({ error: "Email is already in use" }, { status: 400 });
+      }
+    }
+
+    data.email = email;
   }
 
   if (newPassword) {
@@ -92,4 +112,3 @@ export async function PATCH(req: Request) {
     message: "Security settings updated",
   });
 }
-

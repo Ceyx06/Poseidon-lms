@@ -298,7 +298,7 @@ export default function ERegistrationPage() {
                     <td style={{ padding: "12px 18px", color: "#1a6bbf" }}>{r.email}</td>
                     <td style={{ padding: "12px 18px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontFamily: "monospace", color: "#2d3b4f" }}>
+                        <span style={{ fontFamily: "monospace", color: "#000000", fontWeight: 700 }}>
                           {showPassword[r.id] ? r.password : "********"}
                         </span>
                         <button
