@@ -1,100 +1,75 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-async function ensureCoordinatorFileTable() {
-  // Safety net for environments without Prisma migrations applied.
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "CoordinatorFile" (
-      "id" TEXT PRIMARY KEY,
-      "crewName" TEXT NOT NULL,
-      "crewKey" TEXT NOT NULL,
-      "fileName" TEXT NOT NULL,
-      "fileUrl" TEXT NOT NULL,
-      "fileSize" TEXT NOT NULL,
-      "publicId" TEXT,
-      "uploadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await prisma.$executeRawUnsafe(`
-    CREATE INDEX IF NOT EXISTS "CoordinatorFile_crewKey_idx"
-    ON "CoordinatorFile" ("crewKey");
-  `);
-}
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+);
 
 export async function GET() {
   try {
-    await ensureCoordinatorFileTable();
+    const { data, error } = await supabase
+      .from("crew_documents")
+      .select("*")
+      .order("uploaded_at", { ascending: false });
 
-    const files = await prisma.coordinatorFile.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    if (error) throw error;
 
-    const formatted = files.map((file) => ({
-      id: file.id,
-      crewName: file.crewName,
-      crewKey: file.crewKey,
-      fileName: file.fileName,
-      fileUrl: file.fileUrl,
-      fileSize: file.fileSize,
-      publicId: file.publicId ?? undefined,
-      uploadedAt: file.uploadedAt.toLocaleString("en-PH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+    const mapped = data.map((r) => ({
+      id: r.id,
+      crewName: r.crew_name,
+      crewKey: r.crew_key,
+      fileName: r.file_name,
+      fileUrl: r.file_url,
+      fileSize: r.file_size,
+      publicId: r.public_id,
+      uploadedAt: new Date(r.uploaded_at).toLocaleString("en-PH", {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit"
       }),
     }));
 
-    return NextResponse.json(formatted);
+    return NextResponse.json(mapped);
   } catch (error) {
-    console.error("GET /api/coordinator-files error:", error);
-    return NextResponse.json({ error: "Failed to fetch files." }, { status: 500 });
+    console.error("Fetch error:", error);
+    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    await ensureCoordinatorFileTable();
-
     const { crewName, crewKey, fileName, fileUrl, fileSize, publicId } = await req.json();
 
-    if (!crewName || !fileName || !fileUrl) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
-    }
+    const { data, error } = await supabase
+      .from("crew_documents")
+      .insert({
+        crew_name: crewName,
+        crew_key: crewKey,
+        file_name: fileName,
+        file_url: fileUrl,
+        file_size: fileSize,
+        public_id: publicId,
+      })
+      .select()
+      .single();
 
-    const file = await prisma.coordinatorFile.create({
-      data: {
-        crewName,
-        crewKey: crewKey || crewName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
-        fileName,
-        fileUrl,
-        fileSize: fileSize || "",
-        publicId: publicId || null,
-      },
-    });
+    if (error) throw error;
 
     return NextResponse.json({
-      id: file.id,
-      crewName: file.crewName,
-      crewKey: file.crewKey,
-      fileName: file.fileName,
-      fileUrl: file.fileUrl,
-      fileSize: file.fileSize,
-      publicId: file.publicId ?? undefined,
-      uploadedAt: file.uploadedAt.toLocaleString("en-PH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+      id: data.id,
+      crewName: data.crew_name,
+      crewKey: data.crew_key,
+      fileName: data.file_name,
+      fileUrl: data.file_url,
+      fileSize: data.file_size,
+      publicId: data.public_id,
+      uploadedAt: new Date(data.uploaded_at).toLocaleString("en-PH", {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit"
       }),
     });
   } catch (error) {
-    console.error("POST /api/coordinator-files error:", error);
-    const message = error instanceof Error ? error.message : "Failed to save file.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Save error:", error);
+    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
 }

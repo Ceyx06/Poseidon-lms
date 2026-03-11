@@ -257,3 +257,14 @@ model CoordinatorFile {
 
   @@index([crewKey])
 }
+
+model Resume {
+  id         String   @id @default(cuid())
+  crewName   String
+  fileName   String
+  fileUrl    String
+  fileSize   String
+  publicId   String?
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
