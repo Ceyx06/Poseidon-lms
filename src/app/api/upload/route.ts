@@ -13,11 +13,14 @@ export async function POST(req: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
+        const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+        const resourceType = isImage ? "image" : "raw";
+
         const result = await new Promise((resolve, reject) => {
             cloudinary.uploader.upload_stream(
                 {
                     folder: "poseidon-ims",
-                    resource_type: "auto",
+                    resource_type: resourceType,
                 },
                 (error, result) => {
                     if (error) reject(error);
@@ -26,7 +29,11 @@ export async function POST(req: NextRequest) {
             ).end(buffer);
         });
 
-        const upload = result as { secure_url: string; public_id: string; bytes: number; original_filename: string };
+        const upload = result as {
+            secure_url: string;
+            public_id: string;
+            bytes: number;
+        };
 
         return NextResponse.json({
             url: upload.secure_url,

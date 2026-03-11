@@ -1,335 +1,276 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-type CertEntry = {
+interface EmploymentCert {
   id: string;
-  name: string;
-  sizeLabel: string;
-  url: string;
+  crewName: string;
+  rank: string;
+  vesselName: string;
+  principal: string;
+  contractStart: string;
+  contractEnd: string;
+  certNumber: string;
+  issuedDate: string;
+  issuedBy: string;
+  remarks: string;
   fileName: string;
-  mimeType: string;
-  uploadedAt: string;
-};
-
-const STORAGE_KEY = "employment-certs-state-v1";
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  fileUrl: string;
+  createdAt: string;
 }
 
-function canPreview(mime: string) {
-  return (
-    mime.startsWith("application/pdf") ||
-    mime.startsWith("image/") ||
-    mime.startsWith("text/")
-  );
-}
-
-function isOfficeDoc(fileName: string, mime: string) {
-  const lower = fileName.toLowerCase();
-  return (
-    mime.includes("word") ||
-    mime.includes("excel") ||
-    mime.includes("powerpoint") ||
-    lower.endsWith(".doc") ||
-    lower.endsWith(".docx") ||
-    lower.endsWith(".xls") ||
-    lower.endsWith(".xlsx") ||
-    lower.endsWith(".ppt") ||
-    lower.endsWith(".pptx")
-  );
-}
-
-async function uploadFileToCloud(file: File) {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch("/api/upload", { method: "POST", body: fd });
-  if (!res.ok) throw new Error("Upload failed");
-  return (await res.json()) as { url: string; size: number; name: string };
-}
-
-export default function EmploymentCertList() {
-  const [certs, setCerts] = useState<CertEntry[]>([]);
+export default function EmploymentCertPage() {
+  const [showForm, setShowForm] = useState(false);
+  const [records, setRecords] = useState<EmploymentCert[]>([]);
   const [search, setSearch] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    crewName: "", rank: "", vesselName: "", principal: "",
+    contractStart: "", contractEnd: "", certNumber: "",
+    issuedDate: "", issuedBy: "", remarks: "", fileName: "", fileUrl: "",
+  });
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as CertEntry[];
-      setCerts(parsed);
-    } catch (err) {
-      console.error("Failed to restore employment certs", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(certs));
-  }, [certs]);
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!e.target.files?.length) return;
-    try {
-      const incoming: CertEntry[] = await Promise.all(
-        Array.from(e.target.files).map(async (file) => {
-          const uploaded = await uploadFileToCloud(file);
-          return {
-            id: crypto.randomUUID(),
-            name: file.name.replace(/\.[^.]+$/, ""),
-            sizeLabel: formatFileSize(uploaded.size ?? file.size),
-            url: uploaded.url,
-            fileName: file.name,
-            mimeType: file.type || "application/octet-stream",
-            uploadedAt: new Date().toLocaleString("en-PH"),
-          };
-        }),
-      );
-
-      setCerts((prev) =>
-        [...prev, ...incoming].sort((a, b) => a.name.localeCompare(b.name)),
-      );
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed. Please try again.");
-    } finally {
-      e.target.value = "";
-    }
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setForm((prev) => ({ ...prev, fileName: file.name, fileUrl: URL.createObjectURL(file) }));
   }
 
-  function deleteCert(id: string) {
-    setCerts((prev) => prev.filter((c) => c.id !== id));
-  }
-
-  function openCert(cert: CertEntry) {
-    if (canPreview(cert.mimeType)) {
-      const win = window.open("", "_blank", "noopener,noreferrer");
-      if (win) {
-        win.document.write(`
-          <html>
-            <head><title>${cert.name}</title></head>
-            <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5">
-              ${
-                cert.mimeType.startsWith("image/")
-                  ? `<img src="${cert.url}" style="max-width:100%;max-height:100vh;object-fit:contain" />`
-                  : `<embed src="${cert.url}" type="${cert.mimeType}" style="width:100vw;height:100vh;border:none;" />`
-              }
-            </body>
-          </html>
-        `);
-        win.document.close();
-      }
-    } else if (isOfficeDoc(cert.fileName, cert.mimeType)) {
-      const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(cert.url)}`;
-      window.open(officeUrl, "_blank", "noopener,noreferrer");
+  function handleSubmit() {
+    if (!form.crewName || !form.vesselName) {
+      alert("Please fill in Crew Name and Vessel Name.");
+      return;
+    }
+    if (editId) {
+      setRecords((prev) => prev.map((r) => r.id === editId ? { ...r, ...form } : r));
+      setEditId(null);
     } else {
-      alert(
-        "Preview works for PDF, images, and text files. For other types, please download and open in your desktop app.",
-      );
+      setRecords((prev) => [{ id: Date.now().toString(), ...form, createdAt: new Date().toLocaleDateString("en-PH") }, ...prev]);
+    }
+    setForm({ crewName: "", rank: "", vesselName: "", principal: "", contractStart: "", contractEnd: "", certNumber: "", issuedDate: "", issuedBy: "", remarks: "", fileName: "", fileUrl: "" });
+    setShowForm(false);
+  }
+
+  function handleEdit(r: EmploymentCert) {
+    setForm({ crewName: r.crewName, rank: r.rank, vesselName: r.vesselName, principal: r.principal, contractStart: r.contractStart, contractEnd: r.contractEnd, certNumber: r.certNumber, issuedDate: r.issuedDate, issuedBy: r.issuedBy, remarks: r.remarks, fileName: r.fileName, fileUrl: r.fileUrl });
+    setEditId(r.id);
+    setShowForm(true);
+  }
+
+  function handleDelete(id: string) {
+    if (confirm("Delete this employment certificate?")) {
+      setRecords((prev) => prev.filter((r) => r.id !== id));
     }
   }
 
-  const filtered = certs.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.fileName.toLowerCase().includes(search.toLowerCase()),
+  function getContractStatus(contractEnd: string) {
+    if (!contractEnd) return null;
+    const days = Math.ceil((new Date(contractEnd).getTime() - Date.now()) / 86400000);
+    if (days < 0) return { label: "Expired", color: "#c0392b", bg: "rgba(192,57,43,0.08)" };
+    if (days <= 30) return { label: "Critical", color: "#c0600a", bg: "rgba(192,96,10,0.08)" };
+    if (days <= 60) return { label: "Expiring", color: "#9a7d0a", bg: "rgba(154,125,10,0.08)" };
+    return { label: "Active", color: "#1a7a4a", bg: "rgba(26,122,74,0.08)" };
+  }
+
+  const filtered = records.filter((r) =>
+    r.crewName.toLowerCase().includes(search.toLowerCase()) ||
+    r.vesselName.toLowerCase().includes(search.toLowerCase()) ||
+    r.principal.toLowerCase().includes(search.toLowerCase()) ||
+    r.certNumber.toLowerCase().includes(search.toLowerCase())
   );
+
+  const inputStyle = {
+    width: "100%", padding: "10px 14px", borderRadius: "10px",
+    border: "1.5px solid #dce6f0", fontSize: "13px", color: "#1a2d45",
+    background: "#f8fafc", outline: "none", boxSizing: "border-box" as const,
+  };
+
+  const labelStyle = {
+    display: "block", fontSize: "11px", fontFamily: "var(--font-cinzel)",
+    fontWeight: "600" as const, color: "#8a6010",
+    textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "6px",
+  };
 
   return (
     <div style={{ fontFamily: "var(--font-dm)" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <h1
-          style={{
-            fontFamily: "var(--font-cinzel)",
-            fontWeight: "bold",
-            fontSize: "22px",
-            color: "#1a2d45",
-            marginBottom: "4px",
-          }}
-        >
-          Certificate of Employment
-        </h1>
-        <p style={{ fontSize: "13px", color: "#6a85a0" }}>
-          Upload and manage employment certificates
-        </p>
-      </div>
 
-      <div style={{ marginBottom: "14px" }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or file..."
-          style={{
-            width: "100%",
-            padding: "9px 12px",
-            border: "1px solid #d8e0ea",
-            borderRadius: "8px",
-            fontSize: "13px",
-            color: "#1a2d45",
-            outline: "none",
-            background: "#fff",
-            boxSizing: "border-box",
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #d7e1ec",
-          borderRadius: "12px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "10px 14px",
-            borderBottom: "1px solid #e6edf5",
-            background: "#f7fafd",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "8px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: "#fff",
-              background: "#1a6bbf",
-              border: "none",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Upload File
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={handleUpload}
-            style={{ display: "none" }}
-          />
+      {/* Header */}
+      <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "22px", color: "#1a2d45", marginBottom: "4px" }}>
+            📜 Certificate of Employment
+          </h1>
+          <p style={{ fontSize: "13px", color: "#6a85a0" }}>
+            Manage crew employment certificates and contract records
+          </p>
         </div>
+        <button
+          onClick={() => { setShowForm(true); setEditId(null); setForm({ crewName: "", rank: "", vesselName: "", principal: "", contractStart: "", contractEnd: "", certNumber: "", issuedDate: "", issuedBy: "", remarks: "", fileName: "", fileUrl: "" }); }}
+          style={{ fontSize: "13px", padding: "10px 20px", borderRadius: "12px", background: "linear-gradient(135deg, #b8841f, #e8b84b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold" }}>
+          + Add Certificate
+        </button>
+      </div>
 
-        <div
-          style={{
-            padding: "10px 14px",
-            borderBottom: "1px solid #e6edf5",
-            background: "#f7fafd",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "var(--font-cinzel)",
-              fontSize: "10px",
-              letterSpacing: "0.07em",
-              color: "#5d728a",
-              fontWeight: 700,
-            }}
-          >
-            NAME
-          </span>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "24px" }}>
+        {[
+          { label: "Total Certs", value: records.length, color: "#8b5cf6", bg: "#f5f0ff" },
+          { label: "Active", value: records.filter(r => getContractStatus(r.contractEnd)?.label === "Active").length, color: "#1a7a4a", bg: "#edfff5" },
+          { label: "Expiring", value: records.filter(r => ["Critical", "Expiring"].includes(getContractStatus(r.contractEnd)?.label ?? "")).length, color: "#c0600a", bg: "#fff8f0" },
+          { label: "Expired", value: records.filter(r => getContractStatus(r.contractEnd)?.label === "Expired").length, color: "#c0392b", bg: "#fff5f5" },
+        ].map((s) => (
+          <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}25`, borderRadius: "14px", padding: "16px" }}>
+            <div style={{ fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "26px", color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: "11px", color: s.color, marginTop: "2px" }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <div style={{ background: "#ffffff", borderRadius: "16px", border: "1.5px solid rgba(201,151,42,0.25)", padding: "24px", marginBottom: "20px", boxShadow: "0 4px 20px rgba(201,151,42,0.08)" }}>
+          <h3 style={{ fontFamily: "var(--font-cinzel)", fontSize: "14px", fontWeight: "bold", color: "#1a2d45", marginBottom: "20px" }}>
+            {editId ? "✏️ Edit Certificate" : "📜 Add Employment Certificate"}
+          </h3>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+            <div>
+              <label style={labelStyle}>Crew Name *</label>
+              <input value={form.crewName} onChange={(e) => setForm({ ...form, crewName: e.target.value })} placeholder="Full name of crew" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Rank / Position</label>
+              <input value={form.rank} onChange={(e) => setForm({ ...form, rank: e.target.value })} placeholder="e.g. Chief Officer, AB" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Vessel Name *</label>
+              <input value={form.vesselName} onChange={(e) => setForm({ ...form, vesselName: e.target.value })} placeholder="e.g. MV Pacific Star" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Principal / Company</label>
+              <input value={form.principal} onChange={(e) => setForm({ ...form, principal: e.target.value })} placeholder="e.g. JM Global Shipping" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Contract Start</label>
+              <input type="date" value={form.contractStart} onChange={(e) => setForm({ ...form, contractStart: e.target.value })} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Contract End</label>
+              <input type="date" value={form.contractEnd} onChange={(e) => setForm({ ...form, contractEnd: e.target.value })} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Certificate Number</label>
+              <input value={form.certNumber} onChange={(e) => setForm({ ...form, certNumber: e.target.value })} placeholder="e.g. COE-2024-0001" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Date Issued</label>
+              <input type="date" value={form.issuedDate} onChange={(e) => setForm({ ...form, issuedDate: e.target.value })} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Issued By</label>
+              <input value={form.issuedBy} onChange={(e) => setForm({ ...form, issuedBy: e.target.value })} placeholder="e.g. Poseidon IMS" style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>Remarks</label>
+            <textarea value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} placeholder="Optional notes..." rows={2} style={{ ...inputStyle, resize: "none" }} />
+          </div>
+
+          {/* File Upload */}
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Upload Certificate File (PDF / Image)</label>
+            <div style={{ border: "2px dashed #dce6f0", borderRadius: "12px", padding: "20px", textAlign: "center", background: "#f8fafc", cursor: "pointer" }}
+              onClick={() => document.getElementById("empFileInput")?.click()}>
+              {form.fileName ? (
+                <div>
+                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>📎</div>
+                  <p style={{ fontSize: "13px", color: "#1a6bbf", fontWeight: "500" }}>{form.fileName}</p>
+                  <p style={{ fontSize: "11px", color: "#a0b0c0" }}>Click to change file</p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>☁️</div>
+                  <p style={{ fontSize: "13px", color: "#6a85a0" }}>Click to upload PDF or image</p>
+                  <p style={{ fontSize: "11px", color: "#a0b0c0" }}>Supports: PDF, JPG, PNG</p>
+                </div>
+              )}
+            </div>
+            <input id="empFileInput" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: "none" }} />
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={handleSubmit} style={{ padding: "10px 24px", borderRadius: "10px", background: "linear-gradient(135deg, #b8841f, #e8b84b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "13px" }}>
+              {editId ? "Save Changes" : "Save Certificate"}
+            </button>
+            <button onClick={() => { setShowForm(false); setEditId(null); }} style={{ padding: "10px 20px", borderRadius: "10px", background: "#f8fafc", color: "#6a85a0", border: "1px solid #e8eef5", cursor: "pointer", fontSize: "13px" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ background: "#ffffff", borderRadius: "16px", border: "1px solid #e8eef5", padding: "24px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <input placeholder="Search by crew name, vessel, principal or cert number..." value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #e8eef5", fontSize: "13px", color: "#1a2d45", background: "#f8fafc", outline: "none", boxSizing: "border-box" }} />
         </div>
 
         {filtered.length === 0 ? (
-          <div
-            style={{
-              padding: "40px 14px",
-              textAlign: "center",
-              color: "#8ea1b8",
-              fontSize: "13px",
-            }}
-          >
-            {certs.length === 0
-              ? "No certificates uploaded yet. Click Upload File to add one."
-              : "No results match your search."}
+          <div style={{ textAlign: "center", padding: "50px 20px", color: "#a0b0c0" }}>
+            <div style={{ fontSize: "48px", marginBottom: "12px" }}>📜</div>
+            <p style={{ fontSize: "14px", fontFamily: "var(--font-cinzel)", color: "#1a2d45", marginBottom: "8px" }}>No Employment Certs Yet</p>
+            <p style={{ fontSize: "13px" }}>Click "+ Add Certificate" to add the first record.</p>
           </div>
         ) : (
-          filtered.map((c, i) => (
-            <div
-              key={c.id}
-              title={c.fileName}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "11px 14px",
-                borderTop: i === 0 ? "none" : "1px solid #e6edf5",
-                background: "#fff",
-                color: "#1a2d45",
-                cursor: "default",
-              }}
-            >
-              <span style={{ fontSize: "14px" }}>📄</span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {c.name}
-                </p>
-                <p style={{ margin: 0, fontSize: "12px", color: "#8ea1b8" }}>
-                  {c.sizeLabel} • {c.uploadedAt}
-                </p>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => openCert(c)}
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#1a6bbf",
-                    background: "#eef4ff",
-                    border: "1px solid #c5d9f5",
-                    borderRadius: "6px",
-                    padding: "6px 10px",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Open
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteCert(c.id)}
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#c0392b",
-                    background: "#fff0ee",
-                    border: "1px solid #f5c5c0",
-                    borderRadius: "6px",
-                    padding: "6px 10px",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  {["Crew Name", "Rank", "Vessel", "Principal", "Cert No.", "Contract Start", "Contract End", "Status", "File", "Actions"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "10px 14px", fontSize: "10px", fontFamily: "var(--font-cinzel)", textTransform: "uppercase", letterSpacing: "0.1em", color: "#a0b0c0", borderBottom: "1px solid #e8eef5", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => {
+                  const status = getContractStatus(r.contractEnd);
+                  return (
+                    <tr key={r.id} style={{ borderTop: "1px solid #f0f4f8", background: i % 2 === 0 ? "#ffffff" : "#fafbfd" }}>
+                      <td style={{ padding: "12px 14px", fontWeight: "500", color: "#1a2d45", whiteSpace: "nowrap" }}>{r.crewName}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.rank || "—"}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.vesselName}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.principal || "—"}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0" }}>{r.certNumber || "—"}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.contractStart || "—"}</td>
+                      <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.contractEnd || "—"}</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        {status ? (
+                          <span style={{ fontSize: "10px", fontFamily: "var(--font-cinzel)", fontWeight: "bold", padding: "4px 10px", borderRadius: "8px", background: status.bg, color: status.color, whiteSpace: "nowrap" }}>
+                            {status.label}
+                          </span>
+                        ) : <span style={{ color: "#a0b0c0" }}>—</span>}
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        {r.fileUrl ? (
+                          <a href={r.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
+                            📎 View
+                          </a>
+                        ) : <span style={{ color: "#a0b0c0", fontSize: "12px" }}>No file</span>}
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button onClick={() => handleEdit(r)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", color: "#1a6bbf", border: "1px solid rgba(26,107,191,0.2)", cursor: "pointer", whiteSpace: "nowrap" }}>✏️ Edit</button>
+                          <button onClick={() => handleDelete(r.id)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(192,57,43,0.08)", color: "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: "pointer", whiteSpace: "nowrap" }}>🗑️ Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
