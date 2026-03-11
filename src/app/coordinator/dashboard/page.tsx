@@ -2,9 +2,18 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
 export default async function CoordinatorDashboardPage() {
+  async function safeCount(countFn: () => Promise<number>): Promise<number> {
+    try {
+      return await countFn();
+    } catch (error) {
+      console.error("Dashboard count failed:", error);
+      return 0;
+    }
+  }
+
   const [totalCrew, totalDocs] = await Promise.all([
-    prisma.crewMember.count(),
-    prisma.crewDocument.count(),
+    safeCount(() => prisma.crewMember.count()),
+    safeCount(() => prisma.crewDocument.count()),
   ]);
 
   const modules = [

@@ -97,7 +97,7 @@ export default function TopBar({ user }: TopBarProps) {
           <div style={{
             width: "36px",
             height: "36px",
-            borderRadius: "10px",
+            borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -112,7 +112,7 @@ export default function TopBar({ user }: TopBarProps) {
               <img
                 src={displayImage}
                 alt="Profile"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
               />
             ) : (
               displayName?.[0]?.toUpperCase() ?? "U"

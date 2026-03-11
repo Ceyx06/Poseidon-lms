@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 export default function SecurityPage() {
@@ -8,6 +8,10 @@ export default function SecurityPage() {
   const [savingAccount, setSavingAccount] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarRef = useRef<HTMLButtonElement | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -133,14 +137,22 @@ export default function SecurityPage() {
             <h2 style={{ fontFamily: "var(--font-cinzel)", fontSize: 14, color: "#1a2d45", marginBottom: 12 }}>
               Profile Photo
             </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-              <div
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", position: "relative" }}>
+              <button
+                type="button"
+                ref={avatarRef}
+                onClick={() => {
+                  if (!imageUrl || !avatarRef.current) return;
+                  const rect = avatarRef.current.getBoundingClientRect();
+                  setMenuPos({ top: rect.bottom + 6, left: rect.left });
+                  setPreviewOpen(true);
+                }}
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 16,
+                  width: 78,
+                  height: 78,
+                  borderRadius: "50%",
                   overflow: "hidden",
-                  border: "1px solid rgba(201,151,42,0.4)",
+                  border: "2px solid rgba(201,151,42,0.35)",
                   background: "rgba(201,151,42,0.12)",
                   display: "flex",
                   alignItems: "center",
@@ -148,42 +160,114 @@ export default function SecurityPage() {
                   color: "#8a6010",
                   fontWeight: 700,
                   fontSize: 24,
+                  padding: 0,
+                  cursor: imageUrl ? "pointer" : "default",
+                  boxShadow: imageUrl ? "0 6px 18px rgba(0,0,0,0.08)" : "none",
                 }}
+                aria-label={imageUrl ? "View profile photo" : "Profile photo placeholder"}
               >
                 {imageUrl ? (
                   <img src={imageUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
                   name?.[0]?.toUpperCase() || "U"
                 )}
-              </div>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#1a2d45",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #d7e1ec",
-                  background: uploading ? "#f8fafc" : "#fff",
-                  cursor: uploading ? "not-allowed" : "pointer",
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadProfileImage(file);
+                  e.currentTarget.value = "";
                 }}
-              >
-                {uploading ? "Uploading..." : "Upload Photo"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  style={{ display: "none" }}
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadProfileImage(file);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
+              />
               <span style={{ fontSize: 11, color: "#94a3b8" }}>JPG, PNG, WEBP up to 2MB</span>
             </div>
           </section>
+
+              {previewOpen && imageUrl && menuPos && (
+                <>
+                  <div
+                    onClick={() => setPreviewOpen(false)}
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      background: "transparent",
+                      zIndex: 9998,
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "fixed",
+                      top: menuPos.top,
+                      left: menuPos.left,
+                      zIndex: 9999,
+                      background: "#0f172a",
+                      color: "#e2e8f0",
+                      borderRadius: 12,
+                      boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+                      width: 220,
+                      display: "grid",
+                      gap: 4,
+                      padding: "6px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.open(imageUrl, "_blank");
+                        setPreviewOpen(false);
+                      }}
+                      style={{
+                        background: "transparent",
+                        color: "#e2e8f0",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "8px 10px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <span role="img" aria-hidden>👁️</span>
+                      See profile picture
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      style={{
+                        background: "transparent",
+                        color: "#e2e8f0",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "8px 10px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <span role="img" aria-hidden>🖼️</span>
+                      Choose profile picture
+                    </button>
+                  </div>
+                </>
+              )}
 
           <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18 }}>
             <h2 style={{ fontFamily: "var(--font-cinzel)", fontSize: 14, color: "#1a2d45", marginBottom: 12 }}>

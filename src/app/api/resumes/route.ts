@@ -14,7 +14,7 @@ export async function GET() {
             .order("uploaded_at", { ascending: false });
 
         if (error) throw error;
-        return NextResponse.json({ resumes: data });
+        return NextResponse.json({ resumes: data ?? [] });
     } catch (error) {
         console.error("Fetch error:", error);
         return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
@@ -49,12 +49,12 @@ export async function DELETE(req: NextRequest) {
     try {
         const { id, publicId } = await req.json();
 
-        // Delete file from Supabase Storage
-        await supabase.storage
-            .from("Poseidon-files")
-            .remove([publicId]);
+        if (publicId) {
+            await supabase.storage
+                .from("Poseidon-files")
+                .remove([publicId]);
+        }
 
-        // Delete record from database
         const { error } = await supabase
             .from("resumes")
             .delete()

@@ -7,33 +7,30 @@ const supabase = createClient(
 );
 
 export async function DELETE(
-    req: NextRequest,
-    { params }: { params: { id: string } }
+    _req: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = params;
-
-        // Get the record first to get publicId
-        const { data: record } = await supabase
+        const { id } = await context.params;
+        const { data: record, error: fetchError } = await supabase
             .from("crew_documents")
             .select("public_id")
             .eq("id", id)
             .single();
 
-        // Delete file from Supabase Storage
-        if (record?.public_id) {
-            await supabase.storage
-                .from("Poseidon-files")
-                .remove([record.public_id]);
+        if (fetchError) throw fetchError;
+        if (!record) return NextResponse.json({ error: "File not found" }, { status: 404 });
+
+        if (record.public_id) {
+            await supabase.storage.from("Poseidon-files").remove([record.public_id]);
         }
 
-        // Delete from database
-        const { error } = await supabase
+        const { error: deleteError } = await supabase
             .from("crew_documents")
             .delete()
             .eq("id", id);
 
-        if (error) throw error;
+        if (deleteError) throw deleteError;
 
         return NextResponse.json({ success: true });
     } catch (error) {

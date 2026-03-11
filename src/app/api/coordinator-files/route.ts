@@ -15,7 +15,7 @@ export async function GET() {
 
     if (error) throw error;
 
-    const mapped = data.map((r) => ({
+    const mapped = (data ?? []).map((r: any) => ({
       id: r.id,
       crewName: r.crew_name,
       crewKey: r.crew_key,
@@ -39,7 +39,6 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const { crewName, crewKey, fileName, fileUrl, fileSize, publicId } = await req.json();
-
     const { data, error } = await supabase
       .from("crew_documents")
       .insert({
@@ -54,6 +53,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+    if (!data) throw new Error("Save failed");
 
     return NextResponse.json({
       id: data.id,

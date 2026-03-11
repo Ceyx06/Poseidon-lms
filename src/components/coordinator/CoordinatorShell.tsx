@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/coordinator/dashboard",                label: "Dashboard",           icon: "📊" },
@@ -21,6 +22,29 @@ export default function CoordinatorShell({ children, user }: {
   user?: { name?: string | null; email?: string | null };
 }) {
   const pathname = usePathname();
+  const [profile, setProfile] = useState<{ name?: string; email?: string; imageUrl?: string | null } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/account/security", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        setProfile({
+          name: data.name,
+          email: data.email,
+          imageUrl: data.imageUrl ?? null,
+        });
+      })
+      .catch(() => { /* ignore */ });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const displayName = profile?.name || user?.name || "Coordinator";
+  const displayEmail = profile?.email || user?.email || "";
+  const displayImage = profile?.imageUrl || null;
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#f0f4f8" }}>
@@ -97,11 +121,15 @@ export default function CoordinatorShell({ children, user }: {
               style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}
             >
               <div style={{ textAlign: "right" }}>
-                <p style={{ fontSize: "13px", fontWeight: 500, color: "#1a2d45" }}>{user?.name}</p>
-                <p style={{ fontSize: "11px", color: "#a0b0c0" }}>{user?.email}</p>
+                <p style={{ fontSize: "13px", fontWeight: 500, color: "#1a2d45" }}>{displayName}</p>
+                <p style={{ fontSize: "11px", color: "#a0b0c0" }}>{displayEmail}</p>
               </div>
-              <div style={{ width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,184,164,0.12)", border: "1.5px solid rgba(16,184,164,0.3)", fontSize: "14px", fontWeight: "bold", color: "#0d8a7a" }}>
-                {user?.name?.[0]?.toUpperCase() ?? "C"}
+              <div style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,184,164,0.12)", border: "1.5px solid rgba(16,184,164,0.3)", fontSize: "14px", fontWeight: "bold", color: "#0d8a7a", overflow: "hidden" }}>
+                {displayImage ? (
+                  <img src={displayImage} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                ) : (
+                  displayName?.[0]?.toUpperCase() ?? "C"
+                )}
               </div>
             </Link>
             <button onClick={() => signOut({ callbackUrl: "/login" })}

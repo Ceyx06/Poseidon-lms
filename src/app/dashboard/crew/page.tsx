@@ -184,13 +184,13 @@ function normalizeDate(v: string): string {
 
   const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slash) {
-    const d1 = Number(slash[1]);
-    const d2 = Number(slash[2]);
+    const monthPart = Number(slash[1]);
+    const dayPart = Number(slash[2]);
     const y = Number(slash[3].length === 2 ? `20${slash[3]}` : slash[3]);
-    if (!Number.isNaN(d1) && !Number.isNaN(d2) && !Number.isNaN(y)) {
-      // Prefer dd/mm/yyyy display style from user requirement.
-      const day = String(d1).padStart(2, "0");
-      const month = String(d2).padStart(2, "0");
+    if (!Number.isNaN(dayPart) && !Number.isNaN(monthPart) && !Number.isNaN(y)) {
+      // Prefer mm/dd/yyyy display style.
+      const day = String(dayPart).padStart(2, "0");
+      const month = String(monthPart).padStart(2, "0");
       return `${y}-${month}-${day}`;
     }
   }
@@ -201,7 +201,7 @@ function normalizeDate(v: string): string {
 function displayDate(v: string) {
   if (!v) return "";
   const [y, m, d] = v.split("-");
-  return y && m && d ? `${d}/${m}/${y}` : "";
+  return y && m && d ? `${m}/${d}/${y}` : "";
 }
 function fromApiRow(row: any): RowData {
   const d = (v: string | null) => v ? new Date(v).toISOString().slice(0, 10) : "";

@@ -179,7 +179,7 @@ export default function ERegistrationPage() {
             cursor: "pointer",
           }}
         >
-          Add Row
+          Add Account
         </button>
         <input
           value={query}
