@@ -1,49 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import cloudinary from "@/lib/cloudinary";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+);
 
 export async function POST(req: NextRequest) {
     try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
+        const { publicId } = await req.json();
+        if (!publicId) return NextResponse.json({ error: "Missing publicId" }, { status: 400 });
 
-        if (!file) {
-            return NextResponse.json({ error: "No file provided" }, { status: 400 });
-        }
+        const { error } = await supabase.storage
+            .from("Poseidon-files")
+            .remove([publicId]);
 
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        if (error) throw error;
 
-        const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
-        const resourceType = isImage ? "image" : "raw";
-
-        const result = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
-                {
-                    folder: "poseidon-ims",
-                    resource_type: resourceType,
-                },
-                (error, result) => {
-                    if (error) reject(error);
-                    else resolve(result);
-                }
-            ).end(buffer);
-        });
-
-        const upload = result as {
-            secure_url: string;
-            public_id: string;
-            bytes: number;
-        };
-
-        return NextResponse.json({
-            url: upload.secure_url,
-            publicId: upload.public_id,
-            size: upload.bytes,
-            name: file.name,
-        });
-
+        return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Upload error:", error);
-        return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+        console.error("Delete error:", error);
+        return NextResponse.json({ error: "Delete failed" }, { status: 500 });
     }
 }
