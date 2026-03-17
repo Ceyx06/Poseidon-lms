@@ -1,138 +1,153 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 interface SeaServiceFileRecord {
   id: string;
   crewName: string;
   fileName: string;
   fileUrl: string;
+  publicId?: string;
   uploadedAt: string;
 }
 
 const ACCEPTED_UPLOAD_TYPES = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.webp";
 
-function isImageFile(fileName: string): boolean {
-  return /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(fileName);
-}
-
-function isPdfFile(fileName: string): boolean {
-  return /\.pdf$/i.test(fileName);
-}
-
-function isOfficeDoc(fileName: string): boolean {
-  return /\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(fileName);
-}
-
-function getPrintableUrl(fileUrl: string, fileName: string): string {
-  if (isPdfFile(fileName) || isImageFile(fileName)) return fileUrl;
-  if (isOfficeDoc(fileName) && (fileUrl.startsWith("http://") || fileUrl.startsWith("https://"))) {
-    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+function getViewUrl(fileName: string, fileUrl: string): string {
+  if (/\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(fileName)) {
+    return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`;
   }
   return fileUrl;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function SeaServicePage() {
   const [showForm, setShowForm] = useState(false);
   const [records, setRecords] = useState<SeaServiceFileRecord[]>([]);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ crewName: "", fileName: "", fileUrl: "" });
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({});
+  const [crewName, setCrewName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  function resetForm() {
-    setForm({ crewName: "", fileName: "", fileUrl: "" });
-    setShowForm(false);
-  }
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setForm((prev) => ({
-      ...prev,
-      fileName: file.name,
-      fileUrl: URL.createObjectURL(file),
-    }));
-  }
-
-  function handleSubmit() {
-    if (!form.crewName.trim()) {
-      alert("Please enter the crew name.");
-      return;
-    }
-    if (!form.fileUrl) {
-      alert("Please upload a file.");
-      return;
-    }
-
-    setRecords((prev) => [
-      {
-        id: Date.now().toString(),
-        crewName: form.crewName.trim(),
-        fileName: form.fileName,
-        fileUrl: form.fileUrl,
-        uploadedAt: new Date().toLocaleString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      },
-      ...prev,
-    ]);
-
-    resetForm();
-  }
-
-  function handleDelete(id: string) {
-    if (!window.confirm("Delete this file record?")) return;
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  function handlePrintFile(fileUrl: string, fileName: string) {
-    const printUrl = getPrintableUrl(fileUrl, fileName);
-    const printWindow = window.open(printUrl, "_blank", "noopener,noreferrer");
-    if (!printWindow) {
-      alert("Pop-up blocked. Please allow pop-ups, then try printing again.");
-      return;
-    }
-    const doPrint = () => {
-      try {
-        printWindow.focus();
-        printWindow.print();
-      } catch {
+  async function fetchRecords() {
+    try {
+      const res = await fetch("/api/sea-service");
+      const data = await res.json();
+      if (data.records) {
+        setRecords(data.records.map((r: any) => ({
+          id: r.id,
+          crewName: r.crewName ?? "",
+          fileName: r.fileName ?? "",
+          fileUrl: r.fileUrl ?? "",
+          publicId: r.publicId ?? "",
+          uploadedAt: new Date(r.uploadedAt ?? r.createdAt).toLocaleString("en-PH", {
+            year: "numeric", month: "short", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          }),
+        })));
       }
-    };
-    printWindow.onload = doPrint;
-    setTimeout(doPrint, 1200);
+    } catch (error) {
+      console.error("Failed to fetch:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!crewName.trim()) { alert("Please enter the crew name."); return; }
+    if (!selectedFile) { alert("Please select a file."); return; }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Upload failed.");
+
+      const saveRes = await fetch("/api/sea-service", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crewName: crewName.trim(),
+          fileName: selectedFile.name,
+          fileUrl: data.url,
+          publicId: data.publicId,
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || "Save failed.");
+
+      setRecords((prev) => [{
+        id: saveData.record.id,
+        crewName: saveData.record.crewName,
+        fileName: saveData.record.fileName,
+        fileUrl: saveData.record.fileUrl,
+        publicId: saveData.record.publicId,
+        uploadedAt: new Date(saveData.record.uploadedAt ?? saveData.record.createdAt).toLocaleString("en-PH", {
+          year: "numeric", month: "short", day: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        }),
+      }, ...prev]);
+
+      setCrewName("");
+      setSelectedFile(null);
+      setShowForm(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDelete(record: SeaServiceFileRecord) {
+    if (!confirm("Delete this file record?")) return;
+    setDeletingIds((prev) => ({ ...prev, [record.id]: true }));
+    try {
+      await fetch("/api/sea-service", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: record.id, publicId: record.publicId }),
+      });
+      setRecords((prev) => prev.filter((r) => r.id !== record.id));
+    } catch {
+      alert("Delete failed.");
+    } finally {
+      setDeletingIds((prev) => ({ ...prev, [record.id]: false }));
+    }
   }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return records;
-    return records.filter((r) => r.crewName.toLowerCase().includes(q) || r.fileName.toLowerCase().includes(q));
+    return records.filter((r) =>
+      (r.crewName ?? "").toLowerCase().includes(q) ||
+      (r.fileName ?? "").toLowerCase().includes(q)
+    );
   }, [records, search]);
 
   const inputStyle = {
-    width: "100%",
-    padding: "10px 14px",
-    borderRadius: "10px",
-    border: "1.5px solid #dce6f0",
-    fontSize: "13px",
-    color: "#1a2d45",
-    background: "#f8fafc",
-    outline: "none",
-    boxSizing: "border-box" as const,
+    width: "100%", padding: "10px 14px", borderRadius: "10px",
+    border: "1.5px solid #dce6f0", fontSize: "13px", color: "#1a2d45",
+    background: "#f8fafc", outline: "none", boxSizing: "border-box" as const,
   };
 
   const labelStyle = {
-    display: "block",
-    fontSize: "11px",
-    fontFamily: "var(--font-cinzel)",
-    fontWeight: "600" as const,
-    color: "#8a6010",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.1em",
-    marginBottom: "6px",
+    display: "block", fontSize: "11px", fontFamily: "var(--font-cinzel)",
+    fontWeight: "600" as const, color: "#8a6010", textTransform: "uppercase" as const,
+    letterSpacing: "0.1em", marginBottom: "6px",
   };
 
   return (
@@ -146,13 +161,8 @@ export default function SeaServicePage() {
             Upload files and manage with open, print, and delete.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setForm({ crewName: "", fileName: "", fileUrl: "" });
-            setShowForm(true);
-          }}
-          style={{ fontSize: "13px", padding: "10px 20px", borderRadius: "12px", background: "linear-gradient(135deg, #b8841f, #e8b84b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold" }}
-        >
+        <button onClick={() => { setCrewName(""); setSelectedFile(null); setShowForm(true); }}
+          style={{ fontSize: "13px", padding: "10px 20px", borderRadius: "12px", background: "linear-gradient(135deg, #b8841f, #e8b84b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold" }}>
           + Upload File
         </button>
       </div>
@@ -162,40 +172,34 @@ export default function SeaServicePage() {
           <h3 style={{ fontFamily: "var(--font-cinzel)", fontSize: "14px", fontWeight: "bold", color: "#1a2d45", marginBottom: "20px" }}>
             Upload Sea Service File
           </h3>
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
             <div>
               <label style={labelStyle}>Crew Name *</label>
-              <input
-                value={form.crewName}
-                onChange={(e) => setForm((prev) => ({ ...prev, crewName: e.target.value }))}
-                placeholder="Enter crew name"
-                style={inputStyle}
-              />
+              <input value={crewName} onChange={(e) => setCrewName(e.target.value)}
+                placeholder="Enter crew name" style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>File *</label>
-              <input type="file" accept={ACCEPTED_UPLOAD_TYPES} onChange={handleFileChange} style={inputStyle} />
+              <input type="file" accept={ACCEPTED_UPLOAD_TYPES}
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                style={inputStyle} />
             </div>
           </div>
 
-          {form.fileName && (
+          {selectedFile && (
             <div style={{ marginBottom: "16px", padding: "10px 12px", borderRadius: "10px", background: "#f2f7ff", border: "1px solid #d4e3fb" }}>
-              <p style={{ margin: 0, fontSize: "13px", color: "#102a43", fontWeight: 600 }}>{form.fileName}</p>
+              <p style={{ margin: 0, fontSize: "13px", color: "#102a43", fontWeight: 600 }}>{selectedFile.name}</p>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#6a85a0" }}>{formatFileSize(selectedFile.size)}</p>
             </div>
           )}
 
           <div style={{ display: "flex", gap: "10px" }}>
-            <button
-              onClick={handleSubmit}
-              style={{ padding: "10px 24px", borderRadius: "10px", background: "linear-gradient(135deg, #b8841f, #e8b84b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "13px" }}
-            >
-              Save File
+            <button onClick={handleSubmit} disabled={uploading}
+              style={{ padding: "10px 24px", borderRadius: "10px", background: uploading ? "#e0e8f0" : "linear-gradient(135deg, #b8841f, #e8b84b)", color: uploading ? "#a0b0c0" : "#fff", border: "none", cursor: uploading ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: "bold", fontSize: "13px" }}>
+              {uploading ? "⏳ Uploading..." : "Save File"}
             </button>
-            <button
-              onClick={resetForm}
-              style={{ padding: "10px 20px", borderRadius: "10px", background: "#f8fafc", color: "#6a85a0", border: "1px solid #e8eef5", cursor: "pointer", fontSize: "13px" }}
-            >
+            <button onClick={() => setShowForm(false)}
+              style={{ padding: "10px 20px", borderRadius: "10px", background: "#f8fafc", color: "#6a85a0", border: "1px solid #e8eef5", cursor: "pointer", fontSize: "13px" }}>
               Cancel
             </button>
           </div>
@@ -204,15 +208,17 @@ export default function SeaServicePage() {
 
       <div style={{ background: "#ffffff", borderRadius: "16px", border: "1px solid #e8eef5", padding: "24px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
         <div style={{ marginBottom: "16px" }}>
-          <input
-            placeholder="Search by crew name or file name..."
-            value={search}
+          <input placeholder="Search by crew name or file name..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #e8eef5", fontSize: "13px", color: "#1a2d45", background: "#f8fafc", outline: "none", boxSizing: "border-box" }}
-          />
+            style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #e8eef5", fontSize: "13px", color: "#1a2d45", background: "#f8fafc", outline: "none", boxSizing: "border-box" }} />
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "50px 20px", color: "#a0b0c0" }}>
+            <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
+            <p style={{ fontSize: "13px" }}>Loading records...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: "50px 20px", color: "#a0b0c0" }}>
             <p style={{ fontSize: "14px", fontFamily: "var(--font-cinzel)", color: "#1a2d45", marginBottom: "8px" }}>No Sea Service Files Yet</p>
             <p style={{ fontSize: "13px", margin: 0 }}>Click "Upload File" to add the first file.</p>
@@ -223,9 +229,7 @@ export default function SeaServicePage() {
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
                   {["Crew Name", "File Name", "Uploaded", "Actions"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "10px 14px", fontSize: "10px", fontFamily: "var(--font-cinzel)", textTransform: "uppercase", letterSpacing: "0.1em", color: "#a0b0c0", borderBottom: "1px solid #e8eef5", whiteSpace: "nowrap" }}>
-                      {h}
-                    </th>
+                    <th key={h} style={{ textAlign: "left", padding: "10px 14px", fontSize: "10px", fontFamily: "var(--font-cinzel)", textTransform: "uppercase", letterSpacing: "0.1em", color: "#a0b0c0", borderBottom: "1px solid #e8eef5", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -237,14 +241,13 @@ export default function SeaServicePage() {
                     <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.uploadedAt}</td>
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                        <a href={r.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
+                        <a href={getViewUrl(r.fileName, r.fileUrl)} target="_blank" rel="noreferrer"
+                          style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
                           Open
                         </a>
-                        <button onClick={() => handlePrintFile(r.fileUrl, r.fileName)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(13,138,122,0.08)", color: "#0d8a7a", border: "1px solid rgba(13,138,122,0.2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                          Print
-                        </button>
-                        <button onClick={() => handleDelete(r.id)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(192,57,43,0.08)", color: "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                          Delete
+                        <button onClick={() => handleDelete(r)} disabled={deletingIds[r.id]}
+                          style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: deletingIds[r.id] ? "#f0f4f8" : "rgba(192,57,43,0.08)", color: deletingIds[r.id] ? "#a0b0c0" : "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: deletingIds[r.id] ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                          {deletingIds[r.id] ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     </td>

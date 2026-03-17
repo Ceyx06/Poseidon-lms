@@ -268,3 +268,13 @@ model Resume {
   uploadedAt DateTime @default(now())
   createdAt  DateTime @default(now())
 }
+
+model SeaServiceFile {
+  id         String   @id @default(cuid())
+  crewName   String
+  fileName   String
+  fileUrl    String
+  publicId   String?
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
