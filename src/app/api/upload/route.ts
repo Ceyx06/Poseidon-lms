@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import cloudinary from "@/lib/cloudinary";
+import { createClient } from "@supabase/supabase-js";
+
+function getSupabase() {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) throw new Error(`Missing Supabase env vars`);
+    return createClient(url, key);
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,38 +19,32 @@ export async function POST(req: NextRequest) {
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
+        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
 
-        const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
-        const resourceType = isImage ? "image" : "raw";
+        const supabase = getSupabase();
 
-        const result = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
-                {
-                    folder: "poseidon-ims",
-                    resource_type: resourceType,
-                },
-                (error, result) => {
-                    if (error) reject(error);
-                    else resolve(result);
-                }
-            ).end(buffer);
-        });
+        const { error } = await supabase.storage
+            .from("Poseidon-files")
+            .upload(fileName, buffer, {
+                contentType: file.type || "application/octet-stream",
+                upsert: false,
+            });
 
-        const upload = result as {
-            secure_url: string;
-            public_id: string;
-            bytes: number;
-        };
+        if (error) throw error;
+
+        const { data: publicData } = supabase.storage
+            .from("Poseidon-files")
+            .getPublicUrl(fileName);
 
         return NextResponse.json({
-            url: upload.secure_url,
-            publicId: upload.public_id,
-            size: upload.bytes,
+            url: publicData.publicUrl,
+            publicId: fileName,
+            size: file.size,
             name: file.name,
         });
 
     } catch (error) {
         console.error("Upload error:", error);
-        return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+        return NextResponse.json({ error: String(error) }, { status: 500 });
     }
 }

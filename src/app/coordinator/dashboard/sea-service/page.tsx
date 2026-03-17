@@ -13,6 +13,13 @@ interface SeaServiceFileRecord {
 
 const ACCEPTED_UPLOAD_TYPES = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.webp";
 
+function getViewUrl(fileName: string, fileUrl: string): string {
+  if (/\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(fileName)) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+  }
+  return fileUrl;
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -238,17 +245,10 @@ export default function SeaServicePage() {
                     <td style={{ padding: "12px 14px", color: "#6a85a0", whiteSpace: "nowrap" }}>{r.uploadedAt}</td>
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                        {/\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(r.fileName) ? (
-                          <a href={r.fileUrl} download={r.fileName}
-                            style={{ fontSize: "11px", color: "#1a7a4a", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,122,74,0.08)", border: "1px solid rgba(26,122,74,0.2)", whiteSpace: "nowrap" }}>
-                            ⬇️ Download
-                          </a>
-                        ) : (
-                          <a href={r.fileUrl} target="_blank" rel="noreferrer"
-                            style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
-                            Open
-                          </a>
-                        )}
+                        <a href={getViewUrl(r.fileName, r.fileUrl)} target="_blank" rel="noreferrer"
+                          style={{ fontSize: "11px", color: "#1a6bbf", textDecoration: "none", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", border: "1px solid rgba(26,107,191,0.2)", whiteSpace: "nowrap" }}>
+                          Open
+                        </a>
                         <button onClick={() => handleDelete(r)} disabled={deletingIds[r.id]}
                           style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: deletingIds[r.id] ? "#f0f4f8" : "rgba(192,57,43,0.08)", color: deletingIds[r.id] ? "#a0b0c0" : "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: deletingIds[r.id] ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                           {deletingIds[r.id] ? "Deleting..." : "Delete"}
