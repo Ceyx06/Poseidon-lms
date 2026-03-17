@@ -26,6 +26,15 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDate(val: string | null | undefined): string {
+  if (!val) return "Unknown";
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? "Unknown" : d.toLocaleString("en-PH", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 export default function SeaServicePage() {
   const [showForm, setShowForm] = useState(false);
   const [records, setRecords] = useState<SeaServiceFileRecord[]>([]);
@@ -47,14 +56,11 @@ export default function SeaServicePage() {
       if (data.records) {
         setRecords(data.records.map((r: any) => ({
           id: r.id,
-          crewName: r.crewName ?? "",
-          fileName: r.fileName ?? "",
-          fileUrl: r.fileUrl ?? "",
-          publicId: r.publicId ?? "",
-          uploadedAt: new Date(r.uploadedAt ?? r.createdAt).toLocaleString("en-PH", {
-            year: "numeric", month: "short", day: "numeric",
-            hour: "2-digit", minute: "2-digit",
-          }),
+          crewName: r.crew_name ?? r.crewName ?? "",
+          fileName: r.file_name ?? r.fileName ?? "",
+          fileUrl: r.file_url ?? r.fileUrl ?? "",
+          publicId: r.public_id ?? r.publicId ?? "",
+          uploadedAt: formatDate(r.created_at ?? r.uploadedAt ?? r.createdAt),
         })));
       }
     } catch (error) {
@@ -90,16 +96,14 @@ export default function SeaServicePage() {
       const saveData = await saveRes.json();
       if (!saveRes.ok) throw new Error(saveData.error || "Save failed.");
 
+      const r = saveData.record;
       setRecords((prev) => [{
-        id: saveData.record.id,
-        crewName: saveData.record.crewName,
-        fileName: saveData.record.fileName,
-        fileUrl: saveData.record.fileUrl,
-        publicId: saveData.record.publicId,
-        uploadedAt: new Date(saveData.record.uploadedAt ?? saveData.record.createdAt).toLocaleString("en-PH", {
-          year: "numeric", month: "short", day: "numeric",
-          hour: "2-digit", minute: "2-digit",
-        }),
+        id: r.id,
+        crewName: r.crew_name ?? r.crewName ?? crewName.trim(),
+        fileName: r.file_name ?? r.fileName ?? selectedFile.name,
+        fileUrl: r.file_url ?? r.fileUrl ?? data.url,
+        publicId: r.public_id ?? r.publicId ?? data.publicId,
+        uploadedAt: formatDate(r.created_at ?? r.uploadedAt ?? r.createdAt),
       }, ...prev]);
 
       setCrewName("");
