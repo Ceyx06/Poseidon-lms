@@ -59,12 +59,12 @@ export default function ResumesPage() {
       if (data.resumes) {
         setRecords(data.resumes.map((r: any) => ({
           id: r.id,
-          crew_name: r.crewName ?? r.crew_name ?? "",
-          file_name: r.fileName ?? r.file_name ?? "",
-          file_url: r.fileUrl ?? r.file_url ?? "",
-          file_size: r.fileSize ?? r.file_size ?? "",
-          public_id: r.publicId ?? r.public_id ?? "",
-          uploaded_at: formatDate(r.uploadedAt ?? r.uploaded_at ?? r.createdAt),
+          crew_name: r.crewName ?? "",
+          file_name: r.fileName ?? "",
+          file_url: r.fileUrl ?? "",
+          file_size: r.fileSize ?? "",
+          public_id: r.publicId ?? "",
+          uploaded_at: formatDate(r.uploadedAt ?? r.createdAt),
         })));
       }
     } catch (error) {

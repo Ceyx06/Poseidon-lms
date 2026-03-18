@@ -12,15 +12,18 @@ export async function GET() {
     try {
         const supabase = getSupabase();
         const { data, error } = await supabase
-            .from("Resume")
+            .from("resume")
             .select("*")
             .order("createdAt", { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error("Fetch error:", JSON.stringify(error));
+            return NextResponse.json({ error: JSON.stringify(error) }, { status: 500 });
+        }
         return NextResponse.json({ resumes: data ?? [] });
     } catch (error) {
-        console.error("Fetch error:", String(error));
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        console.error("Fetch error:", error);
+        return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
     }
 }
 
@@ -30,22 +33,19 @@ export async function POST(req: NextRequest) {
         const { crewName, fileName, fileUrl, fileSize, publicId } = await req.json();
 
         const { data, error } = await supabase
-            .from("Resume")
-            .insert({
-                crewName,
-                fileName,
-                fileUrl,
-                fileSize,
-                publicId,
-            })
+            .from("resume")
+            .insert({ crewName, fileName, fileUrl, fileSize, publicId })
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error("Save error:", JSON.stringify(error));
+            return NextResponse.json({ error: JSON.stringify(error) }, { status: 500 });
+        }
         return NextResponse.json({ resume: data });
     } catch (error) {
-        console.error("Save error:", String(error));
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        console.error("Save error:", error);
+        return NextResponse.json({ error: "Failed to save" }, { status: 500 });
     }
 }
 
@@ -56,21 +56,22 @@ export async function DELETE(req: NextRequest) {
 
         if (publicId) {
             try {
-                await supabase.storage
-                    .from("Poseidon-files")
-                    .remove([publicId]);
+                await supabase.storage.from("Poseidon-files").remove([publicId]);
             } catch { /* ignore */ }
         }
 
         const { error } = await supabase
-            .from("Resume")
+            .from("resume")
             .delete()
             .eq("id", id);
 
-        if (error) throw error;
+        if (error) {
+            console.error("Delete error:", JSON.stringify(error));
+            return NextResponse.json({ error: JSON.stringify(error) }, { status: 500 });
+        }
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Delete error:", String(error));
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        console.error("Delete error:", error);
+        return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
     }
 }
