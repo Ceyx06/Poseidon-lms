@@ -1,42 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCrewDocument, listCrewDocuments } from "@/lib/crew-documents";
+import { createClient } from "@supabase/supabase-js";
+import { PrismaClient } from "@prisma/client";
 
-function asDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  const d = new Date(String(value));
-  return Number.isNaN(d.getTime()) ? null : d;
+const prisma = new PrismaClient();
+
+const BUCKET = "Poseidon-files";
+const FOLDER = "crew-documents";
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error("Missing Supabase env vars");
+  return createClient(url, key);
 }
 
+// GET all crew documents
 export async function GET() {
   try {
-    const rows = await listCrewDocuments();
-    return NextResponse.json({ rows, records: rows });
+    const docs = await prisma.coordinatorFile.findMany({
+      orderBy: { uploadedAt: "desc" },
+    });
+    return NextResponse.json(docs);
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
+// POST — upload a new crew document to Supabase Storage
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
-    const row = await createCrewDocument({
-      crewName: String(payload?.crewName ?? "").trim(),
-      owwaStartDate: asDate(payload?.owwaStartDate),
-      birthdate: asDate(payload?.birthdate),
-      eRegNo: payload?.eRegNo ? String(payload.eRegNo) : null,
-      dateProcessed: asDate(payload?.dateProcessed),
-      dateDeployed: asDate(payload?.dateDeployed),
-      statusTransaction: payload?.statusTransaction ? String(payload.statusTransaction) : null,
-      oecNo: payload?.oecNo ? String(payload.oecNo) : null,
-      rpfNo: payload?.rpfNo ? String(payload.rpfNo) : null,
-      position: payload?.position ? String(payload.position) : null,
-      vessel: payload?.vessel ? String(payload.vessel) : null,
-      principal: payload?.principal ? String(payload.principal) : null,
-      owwaRenewalDate: asDate(payload?.owwaRenewalDate),
-    });
-    return NextResponse.json({ row, record: row });
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+    const formData = await req.formData();
+    const crewName = formData.get("crewName") as string;
+    const file = formData.get("file") as File;
+
+    if (!crewName || !file) {
+      return NextResponse.json(
+        { error: "crewName and file are required." },
+        { status: 400 }
+      );
+    }
+
+    const crewKey = crewName.trim().toLowerCase().replace(/\s+/g, "_");
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = ${ FOLDER }/${crewKey}/${ timestamp }_${ safeName };
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const supabase = getSupabase();
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get the public URL
+    const { data: publicUrlData } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(storagePath);
+
+    const fileUrl = publicUrlData.publicUrl;
+
+    // Format file size
+    const fileSize =
+      file.size >= 1_048_576
+        ? ${(file.size / 1_048_576).toFixed(1)
+  } MB
+  : ${ (file.size / 1024).toFixed(1) } KB;
+
+  // Save to DB
+  const doc = await prisma.coordinatorFile.create({
+    data: {
+      crewName: crewName.trim(),
+      crewKey,
+      fileName: file.name,
+      fileUrl,
+      fileSize,
+      publicId: storagePath, // reuse publicId to store storage path for deletion
+    },
+  });
+
+  return NextResponse.json(doc, { status: 201 });
+} catch (error) {
+  return NextResponse.json({ error: String(error) }, { status: 500 });
+}
 }

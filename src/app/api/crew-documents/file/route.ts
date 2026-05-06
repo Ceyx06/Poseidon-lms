@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_HOST = "res.cloudinary.com";
-
-function safeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
+const ALLOWED_HOST = "qzmjqruufeetteazmnhg.supabase.co";
 
 export async function GET(req: NextRequest) {
   const fileUrl = req.nextUrl.searchParams.get("url");
-  const fileName = req.nextUrl.searchParams.get("name") ?? "document.pdf";
+  const fileName = req.nextUrl.searchParams.get("name") ?? "document";
 
   if (!fileUrl) {
     return NextResponse.json({ error: "Missing url parameter." }, { status: 400 });
@@ -25,30 +21,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unsupported file host." }, { status: 400 });
   }
 
+  const ext = fileName.split(".").pop()?.toLowerCase();
+
+  // Word docs — redirect to Google Docs viewer
+  if (ext === "docx" || ext === "doc") {
+    const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+    return NextResponse.redirect(viewerUrl, { status: 307 });
+  }
+
+  // PDFs and images — stream directly
   try {
-    const upstream = await fetch(parsed.toString(), {
-      cache: "no-store",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "*/*",
-      },
-    });
+    const upstream = await fetch(fileUrl, { cache: "no-store" });
+
     if (!upstream.ok) {
-      // Some Cloudinary resources reject server-side fetch (401/403) but still open in browser.
-      // Fallback to direct browser redirect instead of hard failing.
-      return NextResponse.redirect(parsed.toString(), { status: 307 });
+      return NextResponse.redirect(fileUrl, { status: 307 });
     }
 
-    const contentType = upstream.headers.get("content-type") || "application/pdf";
-    const ext = fileName.toLowerCase().endsWith(".pdf") ? "" : ".pdf";
-    const safeName = safeFileName(fileName + ext);
+    const contentType = upstream.headers.get("content-type") || "application/octet-stream";
 
     return new NextResponse(upstream.body, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${safeName}"`,
+        "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": "private, max-age=0, no-cache",
       },
     });
