@@ -15,16 +15,19 @@ function getSupabase() {
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     const doc = await prisma.coordinatorFile.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!doc) {
       return NextResponse.json({ error: "Document not found." }, { status: 404 });
     }
+
 
     // Delete from Supabase Storage using the stored path
     if (doc.publicId) {
@@ -36,7 +39,8 @@ export async function DELETE(
       if (deleteError) throw deleteError;
     }
 
-    await prisma.coordinatorFile.delete({ where: { id: params.id } });
+    await prisma.coordinatorFile.delete({ where: { id } });
+
 
     return NextResponse.json({ success: true });
   } catch (error) {
