@@ -1,21 +1,10 @@
 // app/dashboard/page.tsx
 import { getDashboardStats, getExpiringAlerts } from "@/lib/actions/dashboard";
 import Link from "next/link";
-import { listCrewDocuments } from "@/lib/crew-documents";
-import { getDaysLeft } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 type CrewAlert = Awaited<ReturnType<typeof getExpiringAlerts>>[number];
-const OWWA_WARN_DAYS = 60;
-const OEC_WARN_DAYS = 14;
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function displayDate(iso: string | Date) {
@@ -71,29 +60,12 @@ function StatusBadge({ status }: { status: keyof typeof STATUS_META }) {
   );
 }
 
-function FieldBadge({ field }: { field: "owwaRenewalDate" | "oecNo" }) {
-  const isOwwa = field === "owwaRenewalDate";
-  return (
-    <span style={{
-      display: "inline-block",
-      fontSize: 9, fontWeight: 700, padding: "2px 7px",
-      borderRadius: 999, letterSpacing: "0.08em",
-      background: isOwwa ? "#dbeafe" : "#f3e8ff",
-      color: isOwwa ? "#1d4ed8" : "#7c3aed",
-    }}>
-      {isOwwa ? "OWWA · 2 YR" : "OEC · 2 MO"}
-    </span>
-  );
-}
-
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const [stats, alerts, crewRows] = await Promise.all([
+  const [stats, alerts] = await Promise.all([
     getDashboardStats(),
-    getExpiringAlerts(),
-    listCrewDocuments(),
-  ]);
+    getExpiringAlerts(),  ]);
 
   const expiredAlerts = alerts.filter((a) => a.status === "EXPIRED");
   const expiringSoonAlerts = alerts.filter((a) => a.status === "EXPIRING");
@@ -352,6 +324,7 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
 
 
 
