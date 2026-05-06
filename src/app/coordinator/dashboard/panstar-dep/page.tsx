@@ -318,30 +318,25 @@ export default function PanstarDeparturePage() {
   }
 
   function openFile(file: FileItem) {
-    if (canPreview(file.mimeType)) {
-      const win = window.open("", "_blank", "noopener,noreferrer");
-      if (win) {
-        win.document.write(`
-          <html>
-            <head><title>${file.name}</title></head>
-            <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5">
-              ${
-                file.mimeType.startsWith("image/")
-                  ? `<img src="${file.url}" style="max-width:100%;max-height:100vh;object-fit:contain" />`
-                  : `<embed src="${file.url}" type="${file.mimeType}" style="width:100vw;height:100vh;border:none;" />`
-              }
-            </body>
-          </html>
-        `);
-        win.document.close();
-      }
-    } else if (isOfficeDoc(file.name, file.mimeType)) {
+    if (!file.url) {
+      alert("File URL is missing. Please re-upload this file.");
+      return;
+    }
+
+    if (isOfficeDoc(file.name, file.mimeType)) {
       const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`;
       window.open(officeUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Open the storage URL directly to avoid blank previews caused by embed/frame restrictions.
+    if (canPreview(file.mimeType)) {
+      window.open(file.url, "_blank", "noopener,noreferrer");
     } else {
       alert(
-        "Preview works for PDF, images, and text files. For other types, please download and open in your desktop app.",
+        "This file type may not preview in-browser. It will open/download in a new tab.",
       );
+      window.open(file.url, "_blank", "noopener,noreferrer");
     }
   }
 

@@ -1,77 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { deleteCrewDocument, updateCrewDocument, type CrewDocumentPayload } from "@/lib/crew-documents";
+import { createClient } from "@supabase/supabase-js";
 
-type CrewDocumentInput = {
-  crewName?: string;
-  owwaStartDate?: string | null;
-  birthdate?: string | null;
-  eRegNo?: string | null;
-  dateProcessed?: string | null;
-  dateDeployed?: string | null;
-  statusTransaction?: string | null;
-  oecNo?: string | null;
-  rpfNo?: string | null;
-  position?: string | null;
-  vessel?: string | null;
-  principal?: string | null;
-  owwaRenewalDate?: string | null;
-};
-
-function toNullable(value?: string | null): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error("Missing Supabase env vars");
+  return createClient(url, key);
 }
 
-function toDate(value?: string | null): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function parsePayload(input: CrewDocumentInput): CrewDocumentPayload {
-  return {
-    crewName: (input.crewName ?? "").trim(),
-    owwaStartDate: toDate(input.owwaStartDate),
-    birthdate: toDate(input.birthdate),
-    eRegNo: toNullable(input.eRegNo),
-    dateProcessed: toDate(input.dateProcessed),
-    dateDeployed: toDate(input.dateDeployed),
-    statusTransaction: toNullable(input.statusTransaction),
-    oecNo: toNullable(input.oecNo),
-    rpfNo: toNullable(input.rpfNo),
-    position: toNullable(input.position),
-    vessel: toNullable(input.vessel),
-    principal: toNullable(input.principal),
-    owwaRenewalDate: toDate(input.owwaRenewalDate),
-  };
-}
-
-function hasAdminOrCoordinatorAccess(session: any) {
-  const role = (session?.user as any)?.role;
-  return role === "ADMIN" || role === "COORDINATOR";
-}
-
-export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasAdminOrCoordinatorAccess(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const { id } = await context.params;
-
-  const body = (await req.json()) as CrewDocumentInput;
-  const payload = parsePayload(body);
-
-  await updateCrewDocument(id, payload);
-  return NextResponse.json({ success: true });
-}
-
-export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasAdminOrCoordinatorAccess(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const { id } = await context.params;
-
-  await deleteCrewDocument(id);
-  return NextResponse.json({ success: true });
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("crew_tracker")
+      .delete()
+      .eq("id", params.id);
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
 }
