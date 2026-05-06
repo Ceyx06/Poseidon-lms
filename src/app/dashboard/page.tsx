@@ -1,35 +1,22 @@
 // app/dashboard/page.tsx
 import { getDashboardStats, getExpiringAlerts } from "@/lib/actions/dashboard";
 import Link from "next/link";
-import { listCrewDocuments } from "@/lib/crew-documents";
-import { getDaysLeft } from "@/lib/utils";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 type CrewAlert = Awaited<ReturnType<typeof getExpiringAlerts>>[number];
-const OWWA_WARN_DAYS = 60;
-const OEC_WARN_DAYS = 14;
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function displayDate(iso: string | Date) {
   if (!iso) return "—";
   const raw = iso instanceof Date ? iso.toISOString() : iso;
   const [y, m, d] = raw.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+  return `${m}/${d}/${y}`;
 }
 
-const URGENCY_META = {
-  expired: { label: "Expired", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", dot: "#dc2626" },
-  critical: { label: "Critical", color: "#d97706", bg: "#fffbeb", border: "#fcd34d", dot: "#f59e0b" },
-  warning: { label: "Expiring Soon", color: "#9a7d0a", bg: "#fefce8", border: "#fde047", dot: "#ca8a04" },
-  caution: { label: "Upcoming", color: "#0e7490", bg: "#ecfeff", border: "#a5f3fc", dot: "#0891b2" },
-  safe: { label: "Valid", color: "#16a34a", bg: "#f0fdf4", border: "#86efac", dot: "#16a34a" },
+const STATUS_META = {
+  EXPIRED: { label: "Expired", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", dot: "#dc2626" },
+  EXPIRING: { label: "Expiring Soon", color: "#d97706", bg: "#fffbeb", border: "#fcd34d", dot: "#f59e0b" },
 } as const;
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -58,8 +45,8 @@ function StatCard({
   );
 }
 
-function UrgencyBadge({ urgency }: { urgency: keyof typeof URGENCY_META }) {
-  const m = URGENCY_META[urgency];
+function StatusBadge({ status }: { status: keyof typeof STATUS_META }) {
+  const m = STATUS_META[status];
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
@@ -73,45 +60,20 @@ function UrgencyBadge({ urgency }: { urgency: keyof typeof URGENCY_META }) {
   );
 }
 
-function FieldBadge({ field }: { field: "owwaRenewalDate" | "oecNo" }) {
-  const isOwwa = field === "owwaRenewalDate";
-  return (
-    <span style={{
-      display: "inline-block",
-      fontSize: 9, fontWeight: 700, padding: "2px 7px",
-      borderRadius: 999, letterSpacing: "0.08em",
-      background: isOwwa ? "#dbeafe" : "#f3e8ff",
-      color: isOwwa ? "#1d4ed8" : "#7c3aed",
-    }}>
-      {isOwwa ? "OWWA · 2 YR" : "OEC · 2 MO"}
-    </span>
-  );
-}
-
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const [stats, alerts, crewRows] = await Promise.all([
+  const [stats, alerts] = await Promise.all([
     getDashboardStats(),
-    getExpiringAlerts(),
-    listCrewDocuments(),
-  ]);
+    getExpiringAlerts(),  ]);
 
-  const owwaExpiringSoon = crewRows.filter((r) => {
-    if (!r.owwaRenewalDate) return false;
-    const daysLeft = getDaysLeft(addMonths(r.owwaRenewalDate, 24));
-    return daysLeft >= 0 && daysLeft <= OWWA_WARN_DAYS;
-  }).length;
-
-  const oecExpiringSoon = crewRows.filter((r) => {
-    if (!r.dateProcessed) return false;
-    const daysLeft = getDaysLeft(addMonths(r.dateProcessed, 2));
-    return daysLeft >= 0 && daysLeft <= OEC_WARN_DAYS;
-  }).length;
-
-  const urgentAlerts = alerts.filter(a => a.urgency === "expired" || a.urgency === "critical");
-  const expiredCount = alerts.filter(a => a.urgency === "expired").length;
-  const criticalCount = alerts.filter(a => a.urgency === "critical").length;
+  const expiredAlerts = alerts.filter((a) => a.status === "EXPIRED");
+  const expiringSoonAlerts = alerts.filter((a) => a.status === "EXPIRING");
+  const urgentAlerts = [...expiredAlerts, ...expiringSoonAlerts];
+  const expiredCount = expiredAlerts.length;
+  const expiringSoonCount = expiringSoonAlerts.length;
+  const expiredCrewCount = new Set(expiredAlerts.map((a) => a.id.split("-")[0])).size;
+  const expiringSoonCrewCount = new Set(expiringSoonAlerts.map((a) => a.id.split("-")[0])).size;
 
   return (
     <div style={{ fontFamily: "var(--font-dm)", padding: "28px 32px", background: "#f0f4f8", minHeight: "100vh" }}>
@@ -150,7 +112,7 @@ export default async function DashboardPage() {
             </p>
             <p style={{ fontSize: 12, color: "#b45309" }}>
               {expiredCount > 0 && <><strong>{expiredCount}</strong> already expired &nbsp;·&nbsp;</>}
-              {criticalCount > 0 && <><strong>{criticalCount}</strong> expiring within 30 days</>}
+              {expiringSoonCount > 0 && <><strong>{expiringSoonCount}</strong> expiring soon</>}
               &nbsp;— scroll down to view details
             </p>
           </div>
@@ -170,16 +132,16 @@ export default async function DashboardPage() {
           color="#0f1f3d" bg="#ffffff" border="#e2e8f0"
         />
         <StatCard
-          label="OWWA Renewal Expiring Soon"
-          value={owwaExpiringSoon}
-          sub={`Within ${OWWA_WARN_DAYS} days`}
+          label="Expiring Soon"
+          value={expiringSoonCrewCount}
+          sub={`${expiringSoonCount} document alerts`}
           color="#ca8a04" bg="#fefce8" border="#fde047"
         />
         <StatCard
-          label="OEC Expiring Soon"
-          value={oecExpiringSoon}
-          sub={`Within ${OEC_WARN_DAYS} days`}
-          color="#d97706" bg="#fffbeb" border="#fcd34d"
+          label="Expired"
+          value={expiredCrewCount}
+          sub={`${expiredCount} document alerts`}
+          color="#dc2626" bg="#fff1f2" border="#fca5a5"
         />
       </div>
 
@@ -207,16 +169,16 @@ export default async function DashboardPage() {
                 Expiry Tracker
               </h2>
               <p style={{ fontSize: 12, color: "#94a3b8" }}>
-                Crew requiring document renewal — sorted by urgency
+                Crew requiring document renewal — categorized as Expiring Soon or Expired
               </p>
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {(["expired", "critical", "warning", "caution"] as const).map(u => {
-                const count = alerts.filter(a => a.urgency === u).length;
+              {(["EXPIRED", "EXPIRING"] as const).map((statusKey) => {
+                const count = alerts.filter((a) => a.status === statusKey).length;
                 if (!count) return null;
-                const m = URGENCY_META[u];
+                const m = STATUS_META[statusKey];
                 return (
-                  <span key={u} style={{
+                  <span key={statusKey} style={{
                     fontSize: 11, fontWeight: 600, padding: "4px 10px",
                     borderRadius: 999, background: m.bg, color: m.color,
                     border: `1px solid ${m.border}`,
@@ -269,8 +231,8 @@ export default async function DashboardPage() {
                 </tr>
               ) : (
                 alerts.map((alert: CrewAlert, i: number) => {
-                  const m = URGENCY_META[alert.urgency];
-                  const isExpired = alert.daysLeft < 0;
+                  const m = STATUS_META[alert.status];
+                  const isExpired = alert.status === "EXPIRED";
 
                   return (
                     <tr key={alert.id} style={{
@@ -328,7 +290,7 @@ export default async function DashboardPage() {
 
                       {/* Urgency badge */}
                       <td style={{ padding: "12px 16px" }}>
-                        <UrgencyBadge urgency={alert.urgency} />
+                        <StatusBadge status={alert.status} />
                       </td>
                     </tr>
                   );
@@ -362,6 +324,7 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
 
 
 

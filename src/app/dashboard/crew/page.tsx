@@ -490,7 +490,8 @@ export default function CrewDocumentsPage() {
       const res = await fetch("/api/crew-documents", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load");
-      setRowsOrdered((data.rows ?? []).map(fromApiRow));
+      const list = data?.rows ?? data?.records ?? [];
+      setRowsOrdered(list.map(fromApiRow));
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -519,7 +520,9 @@ export default function CrewDocumentsPage() {
       const res = await fetch("/api/crew-documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(toApi(base)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to create");
-      return fromApiRow(data.row);
+      const created = data?.row ?? data?.record;
+      if (!created) throw new Error("Create response is missing created row data.");
+      return fromApiRow(created);
     } catch (e: any) { setError(e.message); return null; }
   }
 

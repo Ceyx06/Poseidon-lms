@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type AccountCategory =
   | "E-REGISTRATION"
@@ -35,6 +35,42 @@ export default function ERegistrationPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [query, setQuery] = useState("");
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRows() {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/eregistration", { cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error ?? "Failed to load records.");
+        if (!active) return;
+
+        const mapped: Row[] = (json.records ?? []).map((r: any) => ({
+          id: String(r.id),
+          category: r.category as AccountCategory,
+          crewName: String(r.crew_name ?? ""),
+          email: String(r.email ?? ""),
+          password: String(r.password ?? ""),
+        }));
+
+        setRows(mapped);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load records.";
+        alert(message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadRows();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visibleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,40 +91,77 @@ export default function ERegistrationPage() {
     setShowForm(true);
   }
 
-  function saveRow() {
+  async function saveRow() {
     if (!form.crewName.trim() || !form.email.trim() || !form.password.trim()) {
       alert("Please fill in Name of Crew, Email, and Password.");
       return;
     }
+    if (saving) return;
 
-    if (editId) {
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === editId
-            ? {
-              ...r,
-              crewName: form.crewName,
-              email: form.email,
-              password: form.password,
-            }
-            : r,
-        ),
-      );
-    } else {
-      setRows((prev) => [
-        {
-          id: Date.now().toString(),
-          category: activeTab,
-          crewName: form.crewName,
-          email: form.email,
-          password: form.password,
-        },
-        ...prev,
-      ]);
+    try {
+      setSaving(true);
+      if (editId) {
+        const res = await fetch("/api/eregistration", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editId,
+            crewName: form.crewName.trim(),
+            email: form.email.trim(),
+            password: form.password.trim(),
+          }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error ?? "Failed to update record.");
+
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === editId
+              ? {
+                ...r,
+                crewName: String(json.record?.crew_name ?? form.crewName.trim()),
+                email: String(json.record?.email ?? form.email.trim()),
+                password: String(json.record?.password ?? form.password.trim()),
+              }
+              : r,
+          ),
+        );
+      } else {
+        const res = await fetch("/api/eregistration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: activeTab,
+            crewName: form.crewName.trim(),
+            email: form.email.trim(),
+            password: form.password.trim(),
+          }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error ?? "Failed to create record.");
+
+        setRows((prev) => [
+          {
+            id: String(json.record?.id),
+            category: (json.record?.category ?? activeTab) as AccountCategory,
+            crewName: String(json.record?.crew_name ?? form.crewName.trim()),
+            email: String(json.record?.email ?? form.email.trim()),
+            password: String(json.record?.password ?? form.password.trim()),
+          },
+          ...prev,
+        ]);
+      }
+
+      setShowForm(false);
+      resetForm();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save record.";
+      alert(message);
+    } finally {
+      setSaving(false);
     }
-
-    setShowForm(false);
-    resetForm();
   }
 
   function editRow(row: Row) {
@@ -101,9 +174,22 @@ export default function ERegistrationPage() {
     setShowForm(true);
   }
 
-  function deleteRow(id: string) {
+  async function deleteRow(id: string) {
     if (!confirm("Delete this record?")) return;
-    setRows((prev) => prev.filter((r) => r.id !== id));
+
+    try {
+      const res = await fetch("/api/eregistration", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Failed to delete record.");
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete record.";
+      alert(message);
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -223,18 +309,19 @@ export default function ERegistrationPage() {
             <button
               type="button"
               onClick={saveRow}
+              disabled={saving}
               style={{
                 fontSize: "12px",
                 fontWeight: 700,
                 color: "#fff",
-                background: "#16a34a",
+                background: saving ? "#86c29b" : "#16a34a",
                 border: "none",
                 borderRadius: "8px",
                 padding: "8px 12px",
-                cursor: "pointer",
+                cursor: saving ? "not-allowed" : "pointer",
               }}
             >
-              {editId ? "Save Changes" : "Save Row"}
+              {saving ? "Saving..." : editId ? "Save Changes" : "Save Row"}
             </button>
             <button
               type="button"
@@ -285,7 +372,13 @@ export default function ERegistrationPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleRows.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
+                    Loading records...
+                  </td>
+                </tr>
+              ) : visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
                     No records for {activeTab}.
