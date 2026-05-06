@@ -85,8 +85,9 @@ async function uploadFileToCloud(file: File) {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
-  if (!res.ok) throw new Error("Upload failed");
-  const data = await res.json();
+  const data = await res.json().catch(() => ({} as { error?: string; url?: string; size?: number; name?: string }));
+  if (!res.ok) throw new Error(data?.error || `Upload failed (HTTP ${res.status})`);
+  if (!data?.url) throw new Error("Upload failed: missing file URL from server.");
   return data as { url: string; size: number; name: string };
 }
 

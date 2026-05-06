@@ -38,7 +38,26 @@ function getDelegate() {
   return (prisma as any).oWWARecord;
 }
 
-export function computeCrewExpiryDate(record: Pick<CrewDocumentRecord, "owwaRenewalDate" | "dateProcessed">): Date | null {
+export function computeCrewExpiryDate(record: Pick<CrewDocumentRecord, "owwaRenewalDate" | "dateProcessed" | "oecNo">): Date | null {
+  function parseDateString(value: string | null): Date | null {
+    if (!value) return null;
+    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const d = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (slashMatch) {
+      const year = Number(slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3]);
+      const month = Number(slashMatch[1]) - 1;
+      const day = Number(slashMatch[2]);
+      const d = new Date(year, month, day);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
   const owwaExpiryDate = record.owwaRenewalDate
     ? new Date(
         record.owwaRenewalDate.getFullYear() + 2,
@@ -46,8 +65,9 @@ export function computeCrewExpiryDate(record: Pick<CrewDocumentRecord, "owwaRene
         record.owwaRenewalDate.getDate()
       )
     : null;
-  const oecExpiryDate = record.dateProcessed
-    ? new Date(record.dateProcessed.getFullYear(), record.dateProcessed.getMonth() + 2, record.dateProcessed.getDate())
+  const oecBaseDate = record.dateProcessed ?? parseDateString(record.oecNo ?? null);
+  const oecExpiryDate = oecBaseDate
+    ? new Date(oecBaseDate.getFullYear(), oecBaseDate.getMonth() + 2, oecBaseDate.getDate())
     : null;
 
   const candidates = [owwaExpiryDate, oecExpiryDate].filter((d): d is Date => Boolean(d));

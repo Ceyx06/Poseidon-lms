@@ -35,7 +35,7 @@ export async function GET() {
     return NextResponse.json(mapped);
   } catch (error) {
     console.error("Fetch error:", error);
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Save error:", error);
-    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
 
@@ -99,6 +99,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete error:", error);
-    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
