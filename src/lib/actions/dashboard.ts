@@ -105,8 +105,8 @@ export async function getExpiringAlerts() {
       }> = [];
 
       if (r.owwaRenewalDate) {
-        // OWWA: trigger exactly 2 calendar months before renewal date.
-        const expiryDate = startOfDay(r.owwaRenewalDate);
+        // OWWA: expires 2 years after encoded OWWA date.
+        const expiryDate = startOfDay(addMonths(r.owwaRenewalDate, 24));
         const notificationStartDate = subMonths(expiryDate, 2);
         const daysLeft = differenceInCalendarDays(expiryDate, today);
         const warnDays = 60; // used only for UI metadata

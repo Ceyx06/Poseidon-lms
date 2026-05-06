@@ -1,25 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createCrewDocument, listCrewDocuments } from "@/lib/crew-documents";
 
-function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key);
+function asDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET() {
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from("crew_tracker")
-      .delete()
-      .eq("id", params.id);
-    if (error) throw error;
-    return NextResponse.json({ success: true });
+    const rows = await listCrewDocuments();
+    return NextResponse.json({ rows, records: rows });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const payload = await req.json();
+    const row = await createCrewDocument({
+      crewName: String(payload?.crewName ?? "").trim(),
+      owwaStartDate: asDate(payload?.owwaStartDate),
+      birthdate: asDate(payload?.birthdate),
+      eRegNo: payload?.eRegNo ? String(payload.eRegNo) : null,
+      dateProcessed: asDate(payload?.dateProcessed),
+      dateDeployed: asDate(payload?.dateDeployed),
+      statusTransaction: payload?.statusTransaction ? String(payload.statusTransaction) : null,
+      oecNo: payload?.oecNo ? String(payload.oecNo) : null,
+      rpfNo: payload?.rpfNo ? String(payload.rpfNo) : null,
+      position: payload?.position ? String(payload.position) : null,
+      vessel: payload?.vessel ? String(payload.vessel) : null,
+      principal: payload?.principal ? String(payload.principal) : null,
+      owwaRenewalDate: asDate(payload?.owwaRenewalDate),
+    });
+    return NextResponse.json({ row, record: row });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
