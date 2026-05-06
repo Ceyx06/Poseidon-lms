@@ -17,14 +17,13 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// GET — fetch all resumes
 export async function GET() {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from("resume")
       .select("*")
-      .order("uploadedAt", { ascending: false });
+      .order("createdAt", { ascending: false }); // ✅ fixed: was "uploadedAt"
 
     if (error) throw error;
 
@@ -35,7 +34,7 @@ export async function GET() {
       fileUrl: r.fileUrl ?? "",
       fileSize: r.fileSize ?? "",
       publicId: r.publicId ?? "",
-      uploadedAt: r.uploadedAt ?? r.createdAt ?? "",
+      uploadedAt: r.createdAt ?? "",
     }));
 
     return NextResponse.json({ resumes });
@@ -45,7 +44,6 @@ export async function GET() {
   }
 }
 
-// POST — upload file to Supabase Storage + save record
 export async function POST(req: NextRequest) {
   try {
     const supabase = getSupabase();
@@ -84,7 +82,7 @@ export async function POST(req: NextRequest) {
     const fileUrl = urlData.publicUrl;
     const fileSize = formatFileSize(file.size);
 
-    // Save to DB
+    // Save to DB — using exact column names from Supabase
     const { data, error: saveError } = await supabase
       .from("resume")
       .insert({
@@ -99,14 +97,23 @@ export async function POST(req: NextRequest) {
 
     if (saveError) throw saveError;
 
-    return NextResponse.json({ resume: data }, { status: 201 });
+    return NextResponse.json({
+      resume: {
+        id: data.id,
+        crewName: data.crewName,
+        fileName: data.fileName,
+        fileUrl: data.fileUrl,
+        fileSize: data.fileSize,
+        publicId: data.publicId,
+        uploadedAt: data.createdAt,
+      },
+    }, { status: 201 });
   } catch (error) {
     console.error("Save error:", error);
     return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
 }
 
-// DELETE — remove from storage + DB
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = getSupabase();
