@@ -13,7 +13,6 @@ interface CrewDocumentRecord {
   publicId?: string;
 }
 
-const STORAGE_KEY_UI = "poseidon.coordinator.crewDocuments.ui";
 const ACCEPTED_UPLOAD_TYPES = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.webp";
 
 function toCrewKey(name: string): string {
@@ -35,25 +34,48 @@ function getFileIcon(fileName: string): string {
   return "FILE";
 }
 
-function getOpenFileUrl(file: CrewDocumentRecord): string {
-  const isPdf = /\.pdf$/i.test(file.fileName);
-  const isOffice = /\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(file.fileName);
-  const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.fileName);
+function getFileIconColor(fileName: string): { color: string; bg: string } {
+  if (/\.pdf$/i.test(fileName)) return { color: "#c0392b", bg: "#fdecea" };
+  if (/\.(doc|docx)$/i.test(fileName)) return { color: "#1a6bbf", bg: "#eaf1ff" };
+  if (/\.(xls|xlsx)$/i.test(fileName)) return { color: "#1a7a4a", bg: "#edfff5" };
+  if (/\.(ppt|pptx)$/i.test(fileName)) return { color: "#c9972a", bg: "#fdfbea" };
+  if (/\.(jpg|jpeg|png|webp)$/i.test(fileName)) return { color: "#7c3aed", bg: "#f5f3ff" };
+  return { color: "#5a6f86", bg: "#f0f4f8" };
+}
 
-  if (isImage) return file.fileUrl;
-  if (isPdf) return `https://docs.google.com/viewer?url=${encodeURIComponent(file.fileUrl)}&embedded=true`;
-  if (isOffice) return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(file.fileUrl)}`;
+function getOpenFileUrl(file: CrewDocumentRecord): string {
+  if (/\.(jpg|jpeg|png|webp)$/i.test(file.fileName)) return file.fileUrl;
+  if (/\.pdf$/i.test(file.fileName)) return `https://docs.google.com/viewer?url=${encodeURIComponent(file.fileUrl)}&embedded=true`;
+  if (/\.(doc|docx|xls|xlsx|ppt|pptx)$/i.test(file.fileName)) return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(file.fileUrl)}`;
   return file.fileUrl;
 }
 
-// Gmail Send Modal
-function GmailModal({
-  selectedFiles,
-  onClose,
-}: {
-  selectedFiles: CrewDocumentRecord[];
-  onClose: () => void;
-}) {
+function toMessage(err: unknown): string {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string") return o.message;
+    if (typeof o.error === "string") return o.error;
+    try { return JSON.stringify(err); } catch { return "Unknown error"; }
+  }
+  return "Unknown error";
+}
+
+// ── Folder SVG Icon ───────────────────────────────────────────────
+function FolderIcon({ color = "#b8841f", size = 56 }: { color?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 14C4 11.8 5.8 10 8 10H22L28 16H48C50.2 16 52 17.8 52 20V44C52 46.2 50.2 48 48 48H8C5.8 48 4 46.2 4 44V14Z" fill={color} fillOpacity="0.22" />
+      <path d="M4 20C4 17.8 5.8 16 8 16H48C50.2 16 52 17.8 52 20V44C52 46.2 50.2 48 48 48H8C5.8 48 4 46.2 4 44V20Z" fill={color} fillOpacity="0.88" />
+      <path d="M4 14C4 11.8 5.8 10 8 10H22L27 16H4V14Z" fill={color} />
+    </svg>
+  );
+}
+
+// ── Gmail Modal ───────────────────────────────────────────────────
+function GmailModal({ selectedFiles, onClose }: { selectedFiles: CrewDocumentRecord[]; onClose: () => void }) {
   const [recipientInput, setRecipientInput] = useState("");
   const [recipients, setRecipients] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -61,69 +83,33 @@ function GmailModal({
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
-  function isValidEmail(email: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  }
-
-  // Add recipient on Enter or comma
-  function handleRecipientKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addRecipient();
-    }
-  }
+  function isValidEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
 
   function addRecipient() {
     const email = recipientInput.trim().replace(/,$/, "");
     if (!email) return;
     if (!isValidEmail(email)) { setError("Invalid email address."); return; }
     if (recipients.includes(email)) { setError("Already added."); return; }
-    setRecipients((prev) => [...prev, email]);
+    setRecipients((p) => [...p, email]);
     setRecipientInput("");
     setError("");
   }
 
-  function removeRecipient(email: string) {
-    setRecipients((prev) => prev.filter((r) => r !== email));
-  }
-
   async function handleSend() {
-    // Also add whatever is still typed in the input
     const lastEmail = recipientInput.trim().replace(/,$/, "");
-    const allRecipients = lastEmail && isValidEmail(lastEmail)
-      ? [...recipients, lastEmail]
-      : recipients;
-
-    if (allRecipients.length === 0) {
-      setError("Please add at least one recipient.");
-      return;
-    }
-
-    setError("");
-    setSending(true);
+    const all = lastEmail && isValidEmail(lastEmail) ? [...recipients, lastEmail] : recipients;
+    if (all.length === 0) { setError("Please add at least one recipient."); return; }
+    setError(""); setSending(true);
     try {
       const res = await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: allRecipients,           // array of recipients
-          message,
-          files: selectedFiles.map((f) => ({
-            fileName: f.fileName,
-            fileUrl: f.fileUrl,
-            crewName: f.crewName,
-            fileSize: f.fileSize,
-          })),
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: all, message, files: selectedFiles.map((f) => ({ fileName: f.fileName, fileUrl: f.fileUrl, crewName: f.crewName, fileSize: f.fileSize })) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to send email.");
+      if (!res.ok) throw new Error(toMessage(data));
       setSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send email.");
-    } finally {
-      setSending(false);
-    }
+    } catch (err) { setError(toMessage(err)); }
+    finally { setSending(false); }
   }
 
   return (
@@ -132,118 +118,50 @@ function GmailModal({
       <div style={{ position: "relative", zIndex: 1001, background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, margin: "0 16px", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
         {sent ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>Done</div>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
             <h3 style={{ fontFamily: "var(--font-cinzel)", color: "#1a7a4a", margin: "0 0 8px" }}>Email Sent!</h3>
-            <p style={{ color: "#6a85a0", fontSize: 13 }}>
-              {selectedFiles.length} file{selectedFiles.length > 1 ? "s" : ""} sent to {recipients.length} recipient{recipients.length > 1 ? "s" : ""}
-            </p>
-            <button onClick={onClose} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 10, background: "linear-gradient(135deg, #1a7a4a, #27ae60)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>
-              Done
-            </button>
+            <p style={{ color: "#6a85a0", fontSize: 13 }}>{selectedFiles.length} file(s) sent to {recipients.length} recipient(s)</p>
+            <button onClick={onClose} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 10, background: "linear-gradient(135deg,#1a7a4a,#27ae60)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>Done</button>
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 16, color: "#102a43" }}>Send via Gmail</h3>
-              <button
-                onClick={onClose}
-                aria-label="Close send email modal"
-                title="Close"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 999,
-                  border: "1px solid #9fb6cf",
-                  background: "#ffffff",
-                  color: "#102a43",
-                  cursor: "pointer",
-                  fontSize: 18,
-                  fontWeight: 800,
-                  lineHeight: "34px",
-                  textAlign: "center",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 2px 8px rgba(16,42,67,0.12)",
-                }}
-              >
-                x
-              </button>
+              <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 999, border: "1px solid #d0dce8", background: "#f8fafc", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
-
-            {/* Files preview */}
             <div style={{ marginBottom: 14, background: "#f5f8fc", borderRadius: 10, padding: 10, border: "1px solid #e3ebf4", maxHeight: 130, overflowY: "auto" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontFamily: "var(--font-cinzel)", textTransform: "uppercase", color: "#6a85a0", fontWeight: 700 }}>
-                {selectedFiles.length} file(s) to send
-              </p>
+              <p style={{ margin: "0 0 8px", fontSize: 11, fontFamily: "var(--font-cinzel)", textTransform: "uppercase", color: "#6a85a0", fontWeight: 700 }}>{selectedFiles.length} file(s) to send</p>
               {selectedFiles.map((f) => (
                 <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid #edf2f7" }}>
-                  <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#1d4ed8", background: "#eaf1ff", borderRadius: 4, padding: "2px 6px" }}>
-                    {getFileIcon(f.fileName)}
-                  </span>
+                  <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#1d4ed8", background: "#eaf1ff", borderRadius: 4, padding: "2px 6px" }}>{getFileIcon(f.fileName)}</span>
                   <span style={{ fontSize: 12, color: "#102a43", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</span>
                   <span style={{ fontSize: 11, color: "#6a85a0" }}>{f.crewName}</span>
                 </div>
               ))}
             </div>
-
-            {/* Recipients input */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                Recipients * <span style={{ fontSize: 10, color: "#1a6bbf", textTransform: "none", fontFamily: "var(--font-dm)", letterSpacing: 0 }}>(press Enter or comma to add)</span>
+                Recipients * <span style={{ fontSize: 10, color: "#1a6bbf", textTransform: "none", fontFamily: "var(--font-dm)", letterSpacing: 0 }}>(Enter or comma to add)</span>
               </label>
-
-              {/* Recipient tags */}
               {recipients.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {recipients.map((email) => (
                     <span key={email} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eaf1ff", border: "1px solid #cfe0ff", borderRadius: 999, padding: "3px 10px", fontSize: 12, color: "#1d4ed8" }}>
                       {email}
-                      <button
-                        onClick={() => removeRecipient(email)}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#6a85a0", fontSize: 13, padding: 0, lineHeight: 1 }}
-                      >x</button>
+                      <button onClick={() => setRecipients((p) => p.filter((r) => r !== email))} style={{ background: "none", border: "none", cursor: "pointer", color: "#6a85a0", fontSize: 13, padding: 0 }}>×</button>
                     </span>
                   ))}
                 </div>
               )}
-
-              <input
-                type="email"
-                value={recipientInput}
-                onChange={(e) => { setRecipientInput(e.target.value); setError(""); }}
-                onKeyDown={handleRecipientKeyDown}
-                onBlur={addRecipient}
-                placeholder="email@example.com"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", outline: "none" }}
-              />
+              <input type="email" value={recipientInput} onChange={(e) => { setRecipientInput(e.target.value); setError(""); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addRecipient(); } }} onBlur={addRecipient} placeholder="email@example.com" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
             </div>
-
-            {/* Message */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                Message (optional)
-              </label>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Add a message to include with the document links..."
-                rows={3}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none", fontFamily: "var(--font-dm)", color: "#102a43", background: "#ffffff", caretColor: "#102a43" }}
-              />
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Message (optional)</label>
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Add a message..." rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none" }} />
             </div>
-
             {error && <p style={{ margin: "0 0 12px", fontSize: 12, color: "#c0392b" }}>{error}</p>}
-
-            <button
-              onClick={handleSend}
-              disabled={sending}
-              style={{ width: "100%", padding: "12px 14px", borderRadius: 10, background: sending ? "#e0e8f0" : "linear-gradient(135deg, #EA4335, #ff6b5b)", color: sending ? "#9aa8b6" : "#fff", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 13 }}
-            >
-              {sending
-                ? "Sending..."
-                : `Send to ${recipients.length || 1} Recipient${recipients.length > 1 ? "s" : ""}  -  ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
+            <button onClick={handleSend} disabled={sending} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, background: sending ? "#e0e8f0" : "linear-gradient(135deg,#EA4335,#ff6b5b)", color: sending ? "#9aa8b6" : "#fff", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 13 }}>
+              {sending ? "Sending..." : `Send to ${recipients.length || 1} Recipient${recipients.length > 1 ? "s" : ""} · ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
             </button>
           </>
         )}
@@ -252,16 +170,136 @@ function GmailModal({
   );
 }
 
-// Main Page
+// ── Folder Side Panel ─────────────────────────────────────────────
+function FolderPanel({
+  folder, onClose, checkedIds, toggleCheck, toggleFolderCheck,
+  deletingIds, handleDelete, setCheckedIds, setShowGmail,
+  folderSelectedFiles, setFolderSelectedFiles, folderUploading, handleFolderUpload,
+}: {
+  folder: { crewName: string; crewKey: string; files: CrewDocumentRecord[] };
+  onClose: () => void;
+  checkedIds: Set<string>;
+  toggleCheck: (id: string) => void;
+  toggleFolderCheck: (files: CrewDocumentRecord[]) => void;
+  deletingIds: Record<string, boolean>;
+  handleDelete: (r: CrewDocumentRecord) => void;
+  setCheckedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setShowGmail: (v: boolean) => void;
+  folderSelectedFiles: Record<string, File[]>;
+  setFolderSelectedFiles: React.Dispatch<React.SetStateAction<Record<string, File[]>>>;
+  folderUploading: Record<string, boolean>;
+  handleFolderUpload: (name: string, key: string) => void;
+}) {
+  const allChecked = folder.files.length > 0 && folder.files.every((f) => checkedIds.has(f.id));
+  const someChecked = folder.files.some((f) => checkedIds.has(f.id));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 900, display: "flex" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(10,25,45,0.52)", backdropFilter: "blur(4px)" }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "min(800px, 96vw)", background: "#fff", boxShadow: "-10px 0 50px rgba(10,25,45,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* Panel header */}
+        <div style={{ background: "linear-gradient(135deg,#0f2742,#1a3a5c)", padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+          <FolderIcon color="#e8b84b" size={46} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>Crew Folder</p>
+            <h2 style={{ margin: "2px 0 0", fontFamily: "var(--font-cinzel)", fontSize: 19, color: "#fff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {folder.crewName}
+            </h2>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <span style={{ background: "rgba(232,184,75,0.18)", border: "1px solid rgba(232,184,75,0.32)", borderRadius: 999, padding: "4px 12px", fontSize: 12, color: "#e8b84b", fontWeight: 700 }}>
+              {folder.files.length} file{folder.files.length !== 1 ? "s" : ""}
+            </span>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div style={{ padding: "12px 24px", borderBottom: "1px solid #e8eef5", background: "#f8fbff", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+          <input
+            id={`folder-file-${folder.crewKey}`}
+            type="file" multiple accept={ACCEPTED_UPLOAD_TYPES}
+            onChange={(e) => setFolderSelectedFiles((prev) => ({ ...prev, [folder.crewKey]: Array.from(e.target.files ?? []) }))}
+            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #c8d6e5", fontSize: 12, color: "#102a43", background: "#fff", cursor: "pointer" }}
+          />
+          {(folderSelectedFiles[folder.crewKey]?.length ?? 0) > 0 && (
+            <span style={{ fontSize: 11, color: "#1a6bbf", fontWeight: 700 }}>{folderSelectedFiles[folder.crewKey].length} ready</span>
+          )}
+          <button type="button" onClick={() => handleFolderUpload(folder.crewName, folder.crewKey)} disabled={folderUploading[folder.crewKey]}
+            style={{ padding: "9px 14px", borderRadius: 8, background: folderUploading[folder.crewKey] ? "#e0e8f0" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: folderUploading[folder.crewKey] ? "#a0b0c0" : "#fff", border: "none", cursor: folderUploading[folder.crewKey] ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}>
+            {folderUploading[folder.crewKey] ? "Uploading..." : "Upload to Folder"}
+          </button>
+
+          {someChecked && (
+            <>
+              <button onClick={() => setShowGmail(true)} style={{ padding: "9px 14px", borderRadius: 8, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}>
+                ✉️ Gmail
+              </button>
+              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "9px 10px", borderRadius: 8, background: "#fff", color: "#5a6f86", border: "1px solid #d0dce8", cursor: "pointer", fontSize: 11 }}>
+                Clear
+              </button>
+            </>
+          )}
+
+          <button type="button" onClick={() => toggleFolderCheck(folder.files)}
+            style={{ padding: "9px 12px", borderRadius: 8, background: allChecked ? "#edfff5" : "#f5f8fc", color: allChecked ? "#1a7a4a" : "#5a6f86", border: `1px solid ${allChecked ? "rgba(26,122,74,0.3)" : "#d0dce8"}`, cursor: "pointer", fontSize: 11, fontWeight: 700, marginLeft: "auto" }}>
+            {allChecked ? "✓ All Selected" : "Select All"}
+          </button>
+        </div>
+
+        {/* Files */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+          {folder.files.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "48px 20px", color: "#7a8fa5", border: "1px dashed #d4e0ec", borderRadius: 12, background: "#f9fcff" }}>
+              <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.4 }}>📄</div>
+              <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 14, color: "#17324d" }}>No files yet</p>
+              <p style={{ margin: "6px 0 0", fontSize: 13 }}>Upload files using the toolbar above.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {folder.files.map((file, index) => {
+                const { color, bg } = getFileIconColor(file.fileName);
+                const isChecked = checkedIds.has(file.id);
+                return (
+                  <div key={file.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${isChecked ? "#bfdbfe" : "#e8eef5"}`, background: isChecked ? "#f0f7ff" : index % 2 === 0 ? "#fff" : "#fbfdff" }}>
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleCheck(file.id)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#1a6bbf", flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color, background: bg, borderRadius: 6, padding: "3px 8px", flexShrink: 0 }}>
+                      {getFileIcon(file.fileName)}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 13, color: "#102a43", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.fileName}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#7a8fa5" }}>{file.fileSize} · {file.uploadedAt}</p>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <a href={getOpenFileUrl(file)} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none", padding: "5px 10px", borderRadius: 6, background: "#eaf1ff", border: "1px solid #cfe0ff", fontWeight: 700 }}>Open</a>
+                      <button type="button" onClick={() => { setCheckedIds(new Set([file.id])); setShowGmail(true); }} style={{ fontSize: 11, color: "#EA4335", padding: "5px 10px", borderRadius: 6, background: "#fff1f0", border: "1px solid #ffc5c2", fontWeight: 700, cursor: "pointer" }}>Gmail</button>
+                      <button type="button" onClick={() => handleDelete(file)} disabled={deletingIds[file.id]} style={{ fontSize: 11, color: deletingIds[file.id] ? "#9ca7b5" : "#c0392b", padding: "5px 10px", borderRadius: 6, background: deletingIds[file.id] ? "#f0f4f8" : "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.2)", fontWeight: 700, cursor: deletingIds[file.id] ? "not-allowed" : "pointer" }}>
+                        {deletingIds[file.id] ? "..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────
 export default function CrewDocumentsPage() {
   const [crewName, setCrewName] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [records, setRecords] = useState<CrewDocumentRecord[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  const [openFolderKey, setOpenFolderKey] = useState<string | null>(null);
   const [folderSelectedFiles, setFolderSelectedFiles] = useState<Record<string, File[]>>({});
   const [folderUploading, setFolderUploading] = useState<Record<string, boolean>>({});
   const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({});
@@ -269,185 +307,106 @@ export default function CrewDocumentsPage() {
   const [showGmail, setShowGmail] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     async function load() {
       try {
-        const res = await fetch("/api/coordinator-files");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) setRecords(data);
-        }
-      } catch {
+        setLoadError("");
+        const res = await fetch("/api/coordinator-files", { cache: "no-store", signal: controller.signal });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(toMessage(data) || `Request failed (${res.status})`);
+        if (!mounted) return;
+        if (Array.isArray(data)) setRecords(data);
+      } catch (err) {
+        if (!mounted) return;
+        setRecords([]);
+        setLoadError(err instanceof Error && err.name === "AbortError" ? "Loading took too long." : toMessage(err));
       } finally {
+        if (!mounted) return;
+        clearTimeout(timeout);
         setLoading(false);
       }
     }
     load();
+    return () => { mounted = false; controller.abort(); clearTimeout(timeout); };
   }, []);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY_UI);
-      const parsed = raw ? (JSON.parse(raw) as { openFolders?: Record<string, boolean> }) : {};
-      if (parsed.openFolders) setOpenFolders(parsed.openFolders);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY_UI, JSON.stringify({ openFolders }));
-  }, [openFolders]);
-
-  // Upload a single file to Supabase via coordinator-files API
-async function uploadSingleFile(
-  file: File,
-  name: string
-): Promise<CrewDocumentRecord> {
-  const cleanName = name.trim();
-  const crewKey = toCrewKey(cleanName);
-
-  // Step 1: Upload binary to Supabase Storage
-  const uploadForm = new FormData();
-  uploadForm.append("file", file);
-
-  const uploadRes = await fetch("/api/upload", {
-    method: "POST",
-    body: uploadForm,
-  });
-
-  const uploadData = await uploadRes.json();
-
-  //  Properly extract error message from response
-  if (!uploadRes.ok) {
-    throw new Error(
-      typeof uploadData?.error === "string"
-        ? uploadData.error
-        : JSON.stringify(uploadData?.error ?? uploadData)
-    );
+  async function uploadSingleFile(file: File, name: string): Promise<CrewDocumentRecord> {
+    const cleanName = name.trim();
+    const crewKey = toCrewKey(cleanName);
+    const uploadForm = new FormData();
+    uploadForm.append("file", file);
+    const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadForm });
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok) throw new Error(toMessage(uploadData));
+    const metaRes = await fetch("/api/coordinator-files", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ crewName: cleanName, crewKey, fileName: file.name, fileUrl: uploadData.url, fileSize: formatFileSize(file.size), publicId: uploadData.publicId }),
+    });
+    const metaData = await metaRes.json();
+    if (!metaRes.ok) throw new Error(toMessage(metaData));
+    return metaData as CrewDocumentRecord;
   }
 
-  // Step 2: Save metadata to DB
-  const metaRes = await fetch("/api/coordinator-files", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      crewName: cleanName,
-      crewKey,
-      fileName: file.name,
-      fileUrl: uploadData.url,
-      fileSize: formatFileSize(file.size),
-      publicId: uploadData.publicId,
-    }),
-  });
-
-  const metaData = await metaRes.json();
-
-  //  Properly extract error message from response
-  if (!metaRes.ok) {
-    throw new Error(
-      typeof metaData?.error === "string"
-        ? metaData.error
-        : JSON.stringify(metaData?.error ?? metaData)
-    );
-  }
-
-  return metaData as CrewDocumentRecord;
-}
-
-  // New folder upload (multiple files)
   async function handleUpload() {
     const cleanName = crewName.trim();
     if (!cleanName) { alert("Please enter the crew name."); return; }
     if (selectedFiles.length === 0) { alert("Please select at least one file."); return; }
-
     setUploading(true);
     setUploadProgress({ done: 0, total: selectedFiles.length });
-
     const newRecords: CrewDocumentRecord[] = [];
     const errors: string[] = [];
-
     for (let i = 0; i < selectedFiles.length; i++) {
       try {
         const saved = await uploadSingleFile(selectedFiles[i], cleanName);
         newRecords.push(saved);
         setUploadProgress({ done: i + 1, total: selectedFiles.length });
-        } catch (err) {
-        errors.push(
-          `${selectedFiles[i].name}: ${
-            err instanceof Error
-              ? err.message
-              : typeof err === "string"
-              ? err
-              : JSON.stringify(err)
-          }`
-        );
-      }
+      } catch (err) { errors.push(`${selectedFiles[i].name}: ${toMessage(err)}`); }
     }
-
     setRecords((prev) => [...newRecords, ...prev]);
-    setCrewName("");
-    setSelectedFiles([]);
-    setUploadProgress(null);
-
+    setCrewName(""); setSelectedFiles([]); setUploadProgress(null);
     const input = document.getElementById("crewDocumentFile") as HTMLInputElement | null;
     if (input) input.value = "";
-
     if (errors.length > 0) alert(`Some files failed:\n${errors.join("\n")}`);
     setUploading(false);
   }
 
-  // Upload inside existing folder (multiple files)
   async function handleFolderUpload(folderName: string, folderKey: string) {
     const files = folderSelectedFiles[folderKey] ?? [];
     if (files.length === 0) { alert("Please select at least one file."); return; }
-
     setFolderUploading((prev) => ({ ...prev, [folderKey]: true }));
-
     const newRecords: CrewDocumentRecord[] = [];
     const errors: string[] = [];
-
     for (const file of files) {
-      try {
-        const saved = await uploadSingleFile(file, folderName);
-        newRecords.push(saved);
-      } catch (err) {
-        errors.push(`${file.name}: ${err instanceof Error ? err.message : "failed"}`);
-      }
+      try { newRecords.push(await uploadSingleFile(file, folderName)); }
+      catch (err) { errors.push(`${file.name}: ${toMessage(err)}`); }
     }
-
     setRecords((prev) => [...newRecords, ...prev]);
     setFolderSelectedFiles((prev) => ({ ...prev, [folderKey]: [] }));
-
     const input = document.getElementById(`folder-file-${folderKey}`) as HTMLInputElement | null;
     if (input) input.value = "";
-
     if (errors.length > 0) alert(`Some files failed:\n${errors.join("\n")}`);
     setFolderUploading((prev) => ({ ...prev, [folderKey]: false }));
   }
 
   async function handleDelete(record: CrewDocumentRecord) {
-    if (!window.confirm(`Delete "${record.fileName}" from ${record.crewName}?`)) return;
+    if (!confirm(`Delete "${record.fileName}"?`)) return;
     setDeletingIds((prev) => ({ ...prev, [record.id]: true }));
     try {
-      await fetch("/api/coordinator-files", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch("/api/coordinator-files", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: record.id, publicId: record.publicId }),
       });
+      if (!res.ok) { const data = await res.json(); throw new Error(toMessage(data)); }
       setRecords((prev) => prev.filter((r) => r.id !== record.id));
       setCheckedIds((prev) => { const n = new Set(prev); n.delete(record.id); return n; });
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Delete failed.");
-    } finally {
-      setDeletingIds((prev) => ({ ...prev, [record.id]: false }));
-    }
+    } catch (err) { alert(toMessage(err)); }
+    finally { setDeletingIds((prev) => ({ ...prev, [record.id]: false })); }
   }
 
   function toggleCheck(id: string) {
-    setCheckedIds((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
+    setCheckedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   function toggleFolderCheck(files: CrewDocumentRecord[]) {
@@ -460,18 +419,7 @@ async function uploadSingleFile(
     });
   }
 
-  const selectedDocuments = useMemo(
-    () => records.filter((r) => checkedIds.has(r.id)),
-    [records, checkedIds]
-  );
-  const selectedCrewCount = useMemo(
-    () => new Set(selectedDocuments.map((d) => d.crewKey)).size,
-    [selectedDocuments]
-  );
-  const selectedPreview = useMemo(
-    () => selectedDocuments.slice(0, 4).map((d) => d.fileName),
-    [selectedDocuments]
-  );
+  const selectedDocuments = useMemo(() => records.filter((r) => checkedIds.has(r.id)), [records, checkedIds]);
 
   const filteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -482,31 +430,46 @@ async function uploadSingleFile(
   const folders = useMemo(() => {
     const map = new Map<string, { crewName: string; crewKey: string; files: CrewDocumentRecord[] }>();
     for (const rec of filteredRecords) {
-      const existing = map.get(rec.crewKey);
-      if (existing) existing.files.push(rec);
+      const ex = map.get(rec.crewKey);
+      if (ex) ex.files.push(rec);
       else map.set(rec.crewKey, { crewName: rec.crewName, crewKey: rec.crewKey, files: [rec] });
     }
-    return Array.from(map.values()).sort((a, b) => a.crewName.localeCompare(b.crewName, undefined, { sensitivity: "base" }));
+    return Array.from(map.values()).sort((a, b) => a.crewName.localeCompare(b.crewName));
   }, [filteredRecords]);
 
-  const totalFolders = useMemo(() => new Set(records.map((r) => r.crewKey)).size, [records]);
+  const openFolder = useMemo(() => folders.find((f) => f.crewKey === openFolderKey) ?? null, [folders, openFolderKey]);
 
-  if (loading) {
+  const FOLDER_COLORS = ["#b8841f", "#1a6bbf", "#1a7a4a", "#7c3aed", "#c0392b", "#0e7490", "#be185d", "#0369a1"];
+
+  if (loading)
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 10 }}>
-        <div style={{ width: 36, height: 36, border: "3px solid #e8eef5", borderTop: "3px solid #1a6bbf", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <div style={{ width: 36, height: 36, border: "3px solid #e8eef5", borderTop: "3px solid #b8841f", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <p style={{ margin: 0, color: "#6a85a0", fontSize: 14 }}>Loading documents...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
-  }
 
   return (
-    <div style={{ fontFamily: "var(--font-dm)", background: "linear-gradient(180deg, #f6f9fc 0%, #ffffff 55%, #f8fafc 100%)", minHeight: "100vh", padding: 22 }}>
+    <div style={{ fontFamily: "var(--font-dm)", background: "linear-gradient(180deg,#f6f9fc 0%,#fff 55%,#f8fafc 100%)", minHeight: "100vh", padding: 22 }}>
+      <style>{`
+        .folder-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+        .folder-card:hover { transform: translateY(-5px) !important; box-shadow: 0 16px 36px rgba(15,39,66,0.16) !important; }
+        .folder-card:active { transform: translateY(-2px) !important; }
+      `}</style>
+
       {showGmail && selectedDocuments.length > 0 && (
-        <GmailModal
-          selectedFiles={selectedDocuments}
-          onClose={() => setShowGmail(false)}
+        <GmailModal selectedFiles={selectedDocuments} onClose={() => setShowGmail(false)} />
+      )}
+
+      {openFolder && (
+        <FolderPanel
+          folder={openFolder} onClose={() => setOpenFolderKey(null)}
+          checkedIds={checkedIds} toggleCheck={toggleCheck} toggleFolderCheck={toggleFolderCheck}
+          deletingIds={deletingIds} handleDelete={handleDelete}
+          setCheckedIds={setCheckedIds} setShowGmail={setShowGmail}
+          folderSelectedFiles={folderSelectedFiles} setFolderSelectedFiles={setFolderSelectedFiles}
+          folderUploading={folderUploading} handleFolderUpload={handleFolderUpload}
         />
       )}
 
@@ -515,52 +478,56 @@ async function uploadSingleFile(
         <div style={{ marginBottom: 20 }}>
           <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7c93", fontWeight: 700 }}>Coordinator Workspace</p>
           <h1 style={{ margin: "6px 0 4px", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 28, color: "#0f2742" }}>Crew Documents</h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#5a6f86" }}>Organize crew records by folder and upload files directly inside each folder.</p>
+          <p style={{ margin: 0, fontSize: 14, color: "#5a6f86" }}>Click any folder to view and manage its files.</p>
         </div>
 
+        {loadError && (
+          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412", fontSize: 13 }}>
+            Documents could not be loaded: {loadError}
+          </div>
+        )}
+
         {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 18 }}>
           {[
-            { label: "Total Folders", value: totalFolders, accent: "#1a6bbf", bg: "#eef4ff" },
+            { label: "Total Folders", value: new Set(records.map((r) => r.crewKey)).size, accent: "#1a6bbf", bg: "#eef4ff" },
             { label: "Total Files", value: records.length, accent: "#1a7a4a", bg: "#edfff5" },
             { label: "Filtered", value: folders.length, accent: "#c9972a", bg: "#fdfbea" },
-          ].map((card) => (
-            <div key={card.label} style={{ border: "1px solid #e8eef5", background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 6px 16px rgba(26,45,69,0.06)" }}>
-              <p style={{ margin: 0, fontSize: 11, color: "#6a7f95", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>{card.label}</p>
-              <p style={{ margin: "4px 0 0", fontSize: 28, lineHeight: 1.1, color: card.accent, fontWeight: 700, fontFamily: "var(--font-cinzel)", background: card.bg, borderRadius: 8, display: "inline-block", padding: "4px 10px" }}>{card.value}</p>
+          ].map((c) => (
+            <div key={c.label} style={{ border: "1px solid #e8eef5", background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 6px 16px rgba(26,45,69,0.06)" }}>
+              <p style={{ margin: 0, fontSize: 11, color: "#6a7f95", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>{c.label}</p>
+              <p style={{ margin: "4px 0 0", fontSize: 28, lineHeight: 1.1, color: c.accent, fontWeight: 700, fontFamily: "var(--font-cinzel)", background: c.bg, borderRadius: 8, display: "inline-block", padding: "4px 10px" }}>{c.value}</p>
             </div>
           ))}
         </div>
 
+        {/* Global selection bar */}
+        {checkedIds.size > 0 && (
+          <div style={{ background: "linear-gradient(135deg,#1a2d45,#0f2742)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 4px 16px rgba(15,39,66,0.2)" }}>
+            <p style={{ margin: 0, color: "#fff", fontSize: 13, fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>📎 {checkedIds.size} file{checkedIds.size > 1 ? "s" : ""} selected</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowGmail(true)} style={{ padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}>✉️ Send via Gmail</button>
+              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 12 }}>Clear</button>
+            </div>
+          </div>
+        )}
+
         {/* New Folder Upload */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(201,151,42,0.25)", padding: 20, marginBottom: 16, boxShadow: "0 8px 18px rgba(201,151,42,0.08)" }}>
+        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(201,151,42,0.25)", padding: 20, marginBottom: 20, boxShadow: "0 8px 18px rgba(201,151,42,0.08)" }}>
           <h3 style={{ fontFamily: "var(--font-cinzel)", fontSize: 14, fontWeight: 700, color: "#102a43", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.08em" }}>New Folder Upload</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 14, marginBottom: 12 }}>
             <div>
               <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Crew Name *</label>
-              <input
-                value={crewName}
-                onChange={(e) => setCrewName(e.target.value)}
-                placeholder="Enter full crew name"
-                style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", outline: "none", boxSizing: "border-box" }}
-              />
+              <input value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Enter full crew name" style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
                 Document Files * <span style={{ fontSize: 10, color: "#1a6bbf", fontFamily: "var(--font-dm)", textTransform: "none", letterSpacing: 0 }}>(select multiple)</span>
               </label>
-              <input
-                id="crewDocumentFile"
-                type="file"
-                multiple
-                accept={ACCEPTED_UPLOAD_TYPES}
-                onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", boxSizing: "border-box", cursor: "pointer" }}
-              />
+              <input id="crewDocumentFile" type="file" multiple accept={ACCEPTED_UPLOAD_TYPES} onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", boxSizing: "border-box", cursor: "pointer" }} />
             </div>
           </div>
 
-          {/* Selected files preview */}
           {selectedFiles.length > 0 && (
             <div style={{ marginBottom: 12, border: "1px solid #d4e3fb", borderRadius: 10, overflow: "hidden" }}>
               {selectedFiles.map((file, i) => (
@@ -573,203 +540,83 @@ async function uploadSingleFile(
             </div>
           )}
 
-          {/* Upload progress */}
           {uploadProgress && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#5a6f86" }}>Uploading {uploadProgress.done} of {uploadProgress.total} files...</span>
+                <span style={{ fontSize: 12, color: "#5a6f86" }}>Uploading {uploadProgress.done} of {uploadProgress.total}...</span>
                 <span style={{ fontSize: 12, color: "#1a6bbf", fontWeight: 700 }}>{Math.round((uploadProgress.done / uploadProgress.total) * 100)}%</span>
               </div>
               <div style={{ height: 6, borderRadius: 999, background: "#e8eef5", overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #1a6bbf, #4d9de0)", width: `${(uploadProgress.done / uploadProgress.total) * 100}%`, transition: "width 0.3s ease" }} />
+                <div style={{ height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#1a6bbf,#4d9de0)", width: `${(uploadProgress.done / uploadProgress.total) * 100}%`, transition: "width 0.3s ease" }} />
               </div>
             </div>
           )}
 
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            style={{ padding: "10px 16px", borderRadius: 10, background: uploading ? "#e0e8f0" : "linear-gradient(135deg, #b8841f, #e8b84b)", color: uploading ? "#a0b0c0" : "#fff", border: "none", cursor: uploading ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}
-          >
+          <button onClick={handleUpload} disabled={uploading} style={{ padding: "10px 16px", borderRadius: 10, background: uploading ? "#e0e8f0" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: uploading ? "#a0b0c0" : "#fff", border: "none", cursor: uploading ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}>
             {uploading ? `Uploading ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...` : `Create Folder + Upload${selectedFiles.length > 1 ? ` (${selectedFiles.length} files)` : ""}`}
           </button>
         </div>
 
-        {/* Documents list */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #d9e3ef", padding: 20, boxShadow: "0 8px 18px rgba(15,39,66,0.06)" }}>
-          <div style={{ marginBottom: 14 }}>
-            <input
-              placeholder="Search by crew name or file name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, color: "#102a43", background: "#f8fbff", outline: "none", boxSizing: "border-box" }}
-            />
-          </div>
-
-          {folders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: "#7a8fa5", border: "1px dashed #d4e0ec", borderRadius: 12, background: "#f9fcff" }}>
-              <p style={{ fontSize: 15, fontFamily: "var(--font-cinzel)", color: "#17324d", margin: "0 0 6px" }}>No documents uploaded yet</p>
-              <p style={{ fontSize: 13, margin: 0 }}>Upload a file above to create your first crew folder.</p>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {folders.map((folder) => {
-                const isOpen = !!openFolders[folder.crewKey];
-                const allChecked = folder.files.every((f) => checkedIds.has(f.id));
-                const someChecked = folder.files.some((f) => checkedIds.has(f.id));
-                const selectedInFolder = folder.files.filter((f) => checkedIds.has(f.id));
-                const selectedFolderPreview = selectedInFolder.slice(0, 3).map((f) => f.fileName).join(", ");
-
-                return (
-                  <div key={folder.crewKey} style={{ border: "1px solid #dbe5f0", borderRadius: 12, background: "#fcfdff" }}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenFolders((prev) => ({ ...prev, [folder.crewKey]: !prev[folder.crewKey] }))}
-                      style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: "transparent", border: "none", cursor: "pointer", padding: 14, textAlign: "left" }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ width: 22, height: 22, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(26,107,191,0.12)", color: "#1a6bbf", fontSize: 12, fontWeight: 700, border: "1px solid rgba(26,107,191,0.22)" }}>
-                          {isOpen ? "-" : "+"}
-                        </span>
-                        <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 15, color: "#102a43", fontWeight: 700 }}>{folder.crewName}</p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {someChecked && (
-                          <span style={{ fontSize: 11, color: "#1a6bbf", background: "#eaf1ff", borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>
-                            {folder.files.filter((f) => checkedIds.has(f.id)).length} selected
-                          </span>
-                        )}
-                        <p style={{ margin: 0, fontSize: 12, color: "#1a6bbf", fontWeight: 700, background: "#eaf1ff", borderRadius: 999, padding: "4px 10px" }}>{folder.files.length} file(s)</p>
-                      </div>
-                    </button>
-
-                    {isOpen && (
-                      <div style={{ padding: "0 14px 14px" }}>
-                        {/* Folder upload row */}
-                        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-                          <input
-                            id={`folder-file-${folder.crewKey}`}
-                            type="file"
-                            multiple
-                            accept={ACCEPTED_UPLOAD_TYPES}
-                            onChange={(e) => setFolderSelectedFiles((prev) => ({ ...prev, [folder.crewKey]: Array.from(e.target.files ?? []) }))}
-                            style={{ padding: "9px 10px", borderRadius: 8, border: "1px solid #c8d6e5", fontSize: 12, color: "#102a43", background: "#fff", cursor: "pointer" }}
-                          />
-                          {(folderSelectedFiles[folder.crewKey]?.length ?? 0) > 0 && (
-                            <span style={{ fontSize: 11, color: "#1a6bbf", fontWeight: 700 }}>
-                              {folderSelectedFiles[folder.crewKey].length} file(s) selected
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleFolderUpload(folder.crewName, folder.crewKey)}
-                            disabled={folderUploading[folder.crewKey]}
-                            style={{ padding: "9px 12px", borderRadius: 8, background: folderUploading[folder.crewKey] ? "#e0e8f0" : "linear-gradient(135deg, #b8841f, #e8b84b)", color: folderUploading[folder.crewKey] ? "#a0b0c0" : "#fff", border: "none", cursor: folderUploading[folder.crewKey] ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}
-                          >
-                            {folderUploading[folder.crewKey] ? "Uploading..." : "Upload to Folder"}
-                          </button>
-
-                          {/* Select all in folder */}
-                          <button
-                            type="button"
-                            onClick={() => toggleFolderCheck(folder.files)}
-                            style={{ padding: "9px 12px", borderRadius: 8, background: allChecked ? "#edfff5" : "#f5f8fc", color: allChecked ? "#1a7a4a" : "#5a6f86", border: `1px solid ${allChecked ? "rgba(26,122,74,0.3)" : "#d0dce8"}`, cursor: "pointer", fontSize: 11, fontWeight: 700 }}
-                          >
-                            {allChecked ? "All Selected" : "Select All"}
-                          </button>
-                        </div>
-
-                        <div style={{ overflowX: "auto", border: "1px solid #e3ebf4", borderRadius: 10, background: "#fff" }}>
-                          {someChecked && (
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "10px 12px", borderBottom: "1px solid #e8eef5", background: "#f8fbff" }}>
-                              <div style={{ minWidth: 220, flex: 1 }}>
-                                <p style={{ margin: 0, color: "#102a43", fontSize: 12, fontWeight: 700 }}>
-                                  {selectedInFolder.length} selected in this folder
-                                </p>
-                                <p style={{ margin: "2px 0 0", color: "#6a7f95", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {selectedFolderPreview}
-                                  {selectedInFolder.length > 3 ? ` +${selectedInFolder.length - 3} more` : ""}
-                                </p>
-                              </div>
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button
-                                  onClick={() => setShowGmail(true)}
-                                  style={{ padding: "7px 12px", borderRadius: 8, background: "linear-gradient(135deg, #EA4335, #ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}
-                                >
-                                  Send via Gmail
-                                </button>
-                                <button
-                                  onClick={() => setCheckedIds(new Set())}
-                                  style={{ padding: "7px 12px", borderRadius: 8, background: "#fff", color: "#5a6f86", border: "1px solid #d0dce8", cursor: "pointer", fontSize: 11, fontWeight: 700 }}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                            <thead>
-                              <tr style={{ background: "#f5f8fc" }}>
-                                {["", "Type", "File Name", "Size", "Uploaded", "Actions"].map((h) => (
-                                  <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, fontFamily: "var(--font-cinzel)", textTransform: "uppercase", letterSpacing: "0.08em", color: "#6c7e91", borderBottom: "1px solid #e3ebf4", whiteSpace: "nowrap" }}>{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {folder.files.map((file, index) => (
-                                <tr key={file.id} style={{ borderTop: "1px solid #f0f4f8", background: checkedIds.has(file.id) ? "#f0f7ff" : index % 2 === 0 ? "#ffffff" : "#fbfdff" }}>
-                                  <td style={{ padding: "10px 12px" }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checkedIds.has(file.id)}
-                                      onChange={() => toggleCheck(file.id)}
-                                      style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#1a6bbf" }}
-                                    />
-                                  </td>
-                                  <td style={{ padding: "10px 12px", color: "#1d4ed8", fontFamily: "var(--font-cinzel)", fontSize: 11, fontWeight: 700 }}>{getFileIcon(file.fileName)}</td>
-                                  <td style={{ padding: "10px 12px", color: "#102a43", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.fileName}</td>
-                                  <td style={{ padding: "10px 12px", color: "#52667f", whiteSpace: "nowrap" }}>{file.fileSize}</td>
-                                  <td style={{ padding: "10px 12px", color: "#52667f", whiteSpace: "nowrap" }}>{file.uploadedAt}</td>
-                                  <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                      <a
-                                        href={getOpenFileUrl(file)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none", padding: "5px 10px", borderRadius: 6, background: "#eaf1ff", border: "1px solid #cfe0ff", fontWeight: 700 }}
-                                      >
-                                        Open
-                                      </a>
-                                      <button
-                                        type="button"
-                                        onClick={() => { setCheckedIds(new Set([file.id])); setShowGmail(true); }}
-                                        style={{ fontSize: 11, color: "#EA4335", padding: "5px 10px", borderRadius: 6, background: "#fff1f0", border: "1px solid #ffc5c2", fontWeight: 700, cursor: "pointer" }}
-                                      >
-                                        Gmail
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDelete(file)}
-                                        disabled={deletingIds[file.id]}
-                                        style={{ fontSize: 11, color: deletingIds[file.id] ? "#9ca7b5" : "#c0392b", padding: "5px 10px", borderRadius: 6, background: deletingIds[file.id] ? "#f0f4f8" : "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.2)", fontWeight: 700, cursor: deletingIds[file.id] ? "not-allowed" : "pointer" }}
-                                      >
-                                        {deletingIds[file.id] ? "Deleting..." : "Delete"}
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* Search */}
+        <div style={{ marginBottom: 16 }}>
+          <input
+            placeholder="Search folders by crew name..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, color: "#102a43", background: "#fff", outline: "none", boxSizing: "border-box", boxShadow: "0 2px 8px rgba(15,39,66,0.05)" }}
+          />
         </div>
+
+        {/* Folder grid */}
+        {folders.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "64px 20px", color: "#7a8fa5", border: "1px dashed #d4e0ec", borderRadius: 14, background: "#f9fcff" }}>
+            <div style={{ fontSize: 52, marginBottom: 12, opacity: 0.35 }}>📁</div>
+            <p style={{ fontSize: 15, fontFamily: "var(--font-cinzel)", color: "#17324d", margin: "0 0 6px" }}>No documents uploaded yet</p>
+            <p style={{ fontSize: 13, margin: 0 }}>Create a folder above to get started.</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 14 }}>
+            {folders.map((folder, idx) => {
+              const color = FOLDER_COLORS[idx % FOLDER_COLORS.length];
+              const someChecked = folder.files.some((f) => checkedIds.has(f.id));
+              return (
+                <div
+                  key={folder.crewKey}
+                  className="folder-card"
+                  onClick={() => setOpenFolderKey(folder.crewKey)}
+                  style={{
+                    background: "#fff",
+                    border: `1.5px solid ${someChecked ? "#93c5fd" : "#e2eaf4"}`,
+                    borderRadius: 14,
+                    padding: "20px 14px 16px",
+                    boxShadow: someChecked
+                      ? "0 0 0 3px rgba(147,197,253,0.35), 0 4px 14px rgba(15,39,66,0.08)"
+                      : "0 4px 14px rgba(15,39,66,0.07)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10,
+                    cursor: "pointer",
+                    position: "relative",
+                    userSelect: "none",
+                  }}
+                >
+                  {someChecked && (
+                    <div style={{ position: "absolute", top: 10, right: 10, width: 9, height: 9, borderRadius: 999, background: "#1a6bbf", boxShadow: "0 0 0 2px #fff" }} />
+                  )}
+                  <FolderIcon color={color} size={62} />
+                  <div style={{ textAlign: "center", width: "100%" }}>
+                    <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 12, fontWeight: 700, color: "#102a43", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {folder.crewName}
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#8a9ab5" }}>
+                      {folder.files.length} file{folder.files.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
