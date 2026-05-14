@@ -192,13 +192,24 @@ export default function ERegistrationPage() {
     }
   }
 
+  const colors = {
+    navy: "#102a43",
+    slate: "#5a6f86",
+    line: "#d8e3ef",
+    panel: "#ffffff",
+    soft: "#f8fbff",
+    gold: "#b8841f",
+    goldSoft: "#fdf7e9",
+    blue: "#1a6bbf",
+  } as const;
+
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "10px 12px",
-    border: "1px solid #d8e0ea",
+    border: `1px solid ${colors.line}`,
     borderRadius: "8px",
     fontSize: "13px",
-    color: "#1a2d45",
+    color: colors.navy,
     background: "#fff",
     outline: "none",
   };
@@ -232,12 +243,12 @@ export default function ERegistrationPage() {
                 setShowForm(false);
                 setEditId(null);
               }}
-              style={{
+            style={{
                 padding: "9px 14px",
                 borderRadius: "10px",
-                border: active ? "1px solid #22406e" : "1px solid #d8e0ea",
-                background: active ? "#0f2347" : "#fff",
-                color: active ? "#fff" : "#5d728a",
+                border: active ? `1px solid ${colors.gold}` : `1px solid ${colors.line}`,
+                background: active ? colors.goldSoft : "#fff",
+                color: active ? colors.gold : colors.slate,
                 fontSize: "12px",
                 fontWeight: 700,
                 letterSpacing: "0.04em",
@@ -258,7 +269,7 @@ export default function ERegistrationPage() {
             fontSize: "12px",
             fontWeight: 700,
             color: "#fff",
-            background: "#1a6bbf",
+            background: "linear-gradient(135deg, #b8841f, #e8b84b)",
             border: "none",
             borderRadius: "8px",
             padding: "9px 14px",
@@ -278,8 +289,8 @@ export default function ERegistrationPage() {
       {showForm && (
         <div
           style={{
-            background: "#fff",
-            border: "1px solid #d8e0ea",
+            background: colors.panel,
+            border: `1px solid ${colors.line}`,
             borderRadius: "10px",
             padding: "14px",
             marginBottom: "12px",
@@ -332,9 +343,9 @@ export default function ERegistrationPage() {
               style={{
                 fontSize: "12px",
                 fontWeight: 700,
-                color: "#5d728a",
+                color: colors.slate,
                 background: "#fff",
-                border: "1px solid #d8e0ea",
+                border: `1px solid ${colors.line}`,
                 borderRadius: "8px",
                 padding: "8px 12px",
                 cursor: "pointer",
@@ -346,23 +357,23 @@ export default function ERegistrationPage() {
         </div>
       )}
 
-      <div style={{ background: "#fff", border: "1px solid #d7e1ec", borderRadius: "14px", overflow: "hidden" }}>
+      <div style={{ background: colors.panel, border: `1px solid ${colors.line}`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 2px 12px rgba(16,42,67,0.06)" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ background: "#0f2347" }}>
+              <tr style={{ background: "#f8fafc" }}>
                 {["NAME OF CREW", "EMAIL", "PASSWORD", "ACTIONS"].map((h) => (
                   <th
                     key={h}
                     style={{
                       textAlign: "left",
-                      padding: "14px 18px",
-                      fontSize: "12px",
+                      padding: "13px 18px",
+                      fontSize: "11px",
                       fontFamily: "var(--font-cinzel)",
-                      letterSpacing: "0.08em",
+                      letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: "rgba(255,255,255,0.75)",
-                      borderRight: "1px solid rgba(255,255,255,0.16)",
+                      color: colors.gold,
+                      borderRight: `1px solid ${colors.line}`,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -374,56 +385,57 @@ export default function ERegistrationPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
-                    Loading records...
+                    <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
+                      Loading records...
                   </td>
                 </tr>
               ) : visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
-                    No records for {activeTab}.
+                    <td colSpan={4} style={{ padding: "26px 22px", color: "#8ea1b8", fontSize: "13px" }}>
+                      No records for {activeTab}.
                   </td>
                 </tr>
               ) : (
                 visibleRows.map((r, i) => (
-                  <tr key={r.id} style={{ background: i % 2 === 0 ? "#ffffff" : "#f8fbff", borderTop: "1px solid #e2ebf4" }}>
-                    <td style={{ padding: "12px 18px", color: "#2d3b4f", fontWeight: 600 }}>{r.crewName}</td>
-                    <td style={{ padding: "12px 18px", color: "#1a6bbf" }}>{r.email}</td>
-                    <td style={{ padding: "12px 18px" }}>
+                  <tr key={r.id} style={{ background: i % 2 === 0 ? "#ffffff" : colors.soft, borderTop: `1px solid ${colors.line}` }}>
+                    <td style={{ padding: "14px 18px", color: colors.navy, fontWeight: 600, fontSize: "14px" }}>{r.crewName}</td>
+                    <td style={{ padding: "14px 18px", color: colors.blue, fontSize: "14px", fontWeight: 500 }}>{r.email}</td>
+                    <td style={{ padding: "14px 18px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontFamily: "monospace", color: "#000000", fontWeight: 700 }}>
+                        <span style={{ fontFamily: "monospace", color: colors.navy, fontWeight: 700, fontSize: "16px", letterSpacing: "0.04em" }}>
                           {showPassword[r.id] ? r.password : "********"}
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowPassword((prev) => ({ ...prev, [r.id]: !prev[r.id] }))}
                           style={{
-                            fontSize: "11px",
-                            border: "1px solid #d8e0ea",
-                            borderRadius: "6px",
-                            background: "#fff",
-                            padding: "3px 8px",
-                            color: "#6a85a0",
+                            fontSize: "12px",
+                            border: `1px solid ${colors.line}`,
+                            borderRadius: "10px",
+                            background: "#f8fafc",
+                            padding: "5px 11px",
+                            color: colors.slate,
                             cursor: "pointer",
+                            fontWeight: 600,
                           }}
                         >
                           {showPassword[r.id] ? "Hide" : "Show"}
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: "12px 18px" }}>
+                    <td style={{ padding: "14px 18px" }}>
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           type="button"
                           onClick={() => editRow(r)}
-                          style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(26,107,191,0.08)", color: "#1a6bbf", border: "1px solid rgba(26,107,191,0.2)", cursor: "pointer" }}
+                          style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "10px", background: "rgba(184,132,31,0.1)", color: colors.gold, border: "1px solid rgba(184,132,31,0.25)", cursor: "pointer", fontWeight: 700 }}
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteRow(r.id)}
-                          style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: "rgba(192,57,43,0.08)", color: "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: "pointer" }}
+                          style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "10px", background: "rgba(192,57,43,0.06)", color: "#c0392b", border: "1px solid rgba(192,57,43,0.2)", cursor: "pointer", fontWeight: 700 }}
                         >
                           Delete
                         </button>

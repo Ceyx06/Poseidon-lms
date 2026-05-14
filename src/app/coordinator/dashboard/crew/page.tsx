@@ -46,7 +46,7 @@ function getOpenFileUrl(file: CrewDocumentRecord): string {
   return file.fileUrl;
 }
 
-// ─── Gmail Send Modal ─────────────────────────────────────────────────────────
+// Gmail Send Modal
 function GmailModal({
   selectedFiles,
   onClose,
@@ -106,7 +106,7 @@ function GmailModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: allRecipients,           // ✅ array of recipients
+          to: allRecipients,           // array of recipients
           message,
           files: selectedFiles.map((f) => ({
             fileName: f.fileName,
@@ -132,7 +132,7 @@ function GmailModal({
       <div style={{ position: "relative", zIndex: 1001, background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, margin: "0 16px", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
         {sent ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>Done</div>
             <h3 style={{ fontFamily: "var(--font-cinzel)", color: "#1a7a4a", margin: "0 0 8px" }}>Email Sent!</h3>
             <p style={{ color: "#6a85a0", fontSize: 13 }}>
               {selectedFiles.length} file{selectedFiles.length > 1 ? "s" : ""} sent to {recipients.length} recipient{recipients.length > 1 ? "s" : ""}
@@ -146,7 +146,30 @@ function GmailModal({
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 16, color: "#102a43" }}>Send via Gmail</h3>
-              <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 999, border: "1px solid #d0dce8", background: "#f8fafc", cursor: "pointer", fontSize: 14 }}>✕</button>
+              <button
+                onClick={onClose}
+                aria-label="Close send email modal"
+                title="Close"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 999,
+                  border: "1px solid #9fb6cf",
+                  background: "#ffffff",
+                  color: "#102a43",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  lineHeight: "34px",
+                  textAlign: "center",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 8px rgba(16,42,67,0.12)",
+                }}
+              >
+                x
+              </button>
             </div>
 
             {/* Files preview */}
@@ -180,7 +203,7 @@ function GmailModal({
                       <button
                         onClick={() => removeRecipient(email)}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "#6a85a0", fontSize: 13, padding: 0, lineHeight: 1 }}
-                      >×</button>
+                      >x</button>
                     </span>
                   ))}
                 </div>
@@ -207,7 +230,7 @@ function GmailModal({
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Add a message to include with the document links..."
                 rows={3}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none", fontFamily: "var(--font-dm)" }}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none", fontFamily: "var(--font-dm)", color: "#102a43", background: "#ffffff", caretColor: "#102a43" }}
               />
             </div>
 
@@ -220,7 +243,7 @@ function GmailModal({
             >
               {sending
                 ? "Sending..."
-                : `Send to ${recipients.length || 1} Recipient${recipients.length > 1 ? "s" : ""} · ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
+                : `Send to ${recipients.length || 1} Recipient${recipients.length > 1 ? "s" : ""}  -  ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
             </button>
           </>
         )}
@@ -229,7 +252,7 @@ function GmailModal({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// Main Page
 export default function CrewDocumentsPage() {
   const [crewName, setCrewName] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -273,7 +296,7 @@ export default function CrewDocumentsPage() {
     window.localStorage.setItem(STORAGE_KEY_UI, JSON.stringify({ openFolders }));
   }, [openFolders]);
 
-  // ─── Upload a single file to Supabase via coordinator-files API ───────────
+  // Upload a single file to Supabase via coordinator-files API
 async function uploadSingleFile(
   file: File,
   name: string
@@ -281,7 +304,7 @@ async function uploadSingleFile(
   const cleanName = name.trim();
   const crewKey = toCrewKey(cleanName);
 
-  // ── Step 1: Upload binary to Supabase Storage ──────────────────
+  // Step 1: Upload binary to Supabase Storage
   const uploadForm = new FormData();
   uploadForm.append("file", file);
 
@@ -292,7 +315,7 @@ async function uploadSingleFile(
 
   const uploadData = await uploadRes.json();
 
-  // ✅ Properly extract error message from response
+  //  Properly extract error message from response
   if (!uploadRes.ok) {
     throw new Error(
       typeof uploadData?.error === "string"
@@ -301,7 +324,7 @@ async function uploadSingleFile(
     );
   }
 
-  // ── Step 2: Save metadata to DB ────────────────────────────────
+  // Step 2: Save metadata to DB
   const metaRes = await fetch("/api/coordinator-files", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -317,7 +340,7 @@ async function uploadSingleFile(
 
   const metaData = await metaRes.json();
 
-  // ✅ Properly extract error message from response
+  //  Properly extract error message from response
   if (!metaRes.ok) {
     throw new Error(
       typeof metaData?.error === "string"
@@ -329,7 +352,7 @@ async function uploadSingleFile(
   return metaData as CrewDocumentRecord;
 }
 
-  // ─── New folder upload (multiple files) ──────────────────────────────────
+  // New folder upload (multiple files)
   async function handleUpload() {
     const cleanName = crewName.trim();
     if (!cleanName) { alert("Please enter the crew name."); return; }
@@ -371,7 +394,7 @@ async function uploadSingleFile(
     setUploading(false);
   }
 
-  // ─── Upload inside existing folder (multiple files) ───────────────────────
+  // Upload inside existing folder (multiple files)
   async function handleFolderUpload(folderName: string, folderKey: string) {
     const files = folderSelectedFiles[folderKey] ?? [];
     if (files.length === 0) { alert("Please select at least one file."); return; }
@@ -441,6 +464,14 @@ async function uploadSingleFile(
     () => records.filter((r) => checkedIds.has(r.id)),
     [records, checkedIds]
   );
+  const selectedCrewCount = useMemo(
+    () => new Set(selectedDocuments.map((d) => d.crewKey)).size,
+    [selectedDocuments]
+  );
+  const selectedPreview = useMemo(
+    () => selectedDocuments.slice(0, 4).map((d) => d.fileName),
+    [selectedDocuments]
+  );
 
   const filteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -500,32 +531,6 @@ async function uploadSingleFile(
             </div>
           ))}
         </div>
-
-        {/* Gmail Send Bar — shows when files are selected */}
-        {checkedIds.size > 0 && (
-          <div style={{ background: "linear-gradient(135deg, #1a2d45, #0f2742)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 4px 16px rgba(15,39,66,0.2)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 20 }}>📎</span>
-              <p style={{ margin: 0, color: "#fff", fontSize: 13, fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>
-                {checkedIds.size} file{checkedIds.size > 1 ? "s" : ""} selected
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => setShowGmail(true)}
-                style={{ padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #EA4335, #ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}
-              >
-                ✉️ Send via Gmail
-              </button>
-              <button
-                onClick={() => setCheckedIds(new Set())}
-                style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 12 }}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* New Folder Upload */}
         <div style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(201,151,42,0.25)", padding: 20, marginBottom: 16, boxShadow: "0 8px 18px rgba(201,151,42,0.08)" }}>
@@ -612,6 +617,8 @@ async function uploadSingleFile(
                 const isOpen = !!openFolders[folder.crewKey];
                 const allChecked = folder.files.every((f) => checkedIds.has(f.id));
                 const someChecked = folder.files.some((f) => checkedIds.has(f.id));
+                const selectedInFolder = folder.files.filter((f) => checkedIds.has(f.id));
+                const selectedFolderPreview = selectedInFolder.slice(0, 3).map((f) => f.fileName).join(", ");
 
                 return (
                   <div key={folder.crewKey} style={{ border: "1px solid #dbe5f0", borderRadius: 12, background: "#fcfdff" }}>
@@ -668,11 +675,38 @@ async function uploadSingleFile(
                             onClick={() => toggleFolderCheck(folder.files)}
                             style={{ padding: "9px 12px", borderRadius: 8, background: allChecked ? "#edfff5" : "#f5f8fc", color: allChecked ? "#1a7a4a" : "#5a6f86", border: `1px solid ${allChecked ? "rgba(26,122,74,0.3)" : "#d0dce8"}`, cursor: "pointer", fontSize: 11, fontWeight: 700 }}
                           >
-                            {allChecked ? "✓ All Selected" : "Select All"}
+                            {allChecked ? "All Selected" : "Select All"}
                           </button>
                         </div>
 
                         <div style={{ overflowX: "auto", border: "1px solid #e3ebf4", borderRadius: 10, background: "#fff" }}>
+                          {someChecked && (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "10px 12px", borderBottom: "1px solid #e8eef5", background: "#f8fbff" }}>
+                              <div style={{ minWidth: 220, flex: 1 }}>
+                                <p style={{ margin: 0, color: "#102a43", fontSize: 12, fontWeight: 700 }}>
+                                  {selectedInFolder.length} selected in this folder
+                                </p>
+                                <p style={{ margin: "2px 0 0", color: "#6a7f95", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {selectedFolderPreview}
+                                  {selectedInFolder.length > 3 ? ` +${selectedInFolder.length - 3} more` : ""}
+                                </p>
+                              </div>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button
+                                  onClick={() => setShowGmail(true)}
+                                  style={{ padding: "7px 12px", borderRadius: 8, background: "linear-gradient(135deg, #EA4335, #ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}
+                                >
+                                  Send via Gmail
+                                </button>
+                                <button
+                                  onClick={() => setCheckedIds(new Set())}
+                                  style={{ padding: "7px 12px", borderRadius: 8, background: "#fff", color: "#5a6f86", border: "1px solid #d0dce8", cursor: "pointer", fontSize: 11, fontWeight: 700 }}
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </div>
+                          )}
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                             <thead>
                               <tr style={{ background: "#f5f8fc" }}>

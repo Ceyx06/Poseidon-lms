@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_HOST = "qzmjqruufeetteazmnhg.supabase.co";
+const ALLOWED_HOSTS = new Set(["qzmjqruufeetteazmnhg.supabase.co"]);
 
 export async function GET(req: NextRequest) {
   const fileUrl = req.nextUrl.searchParams.get("url");
@@ -17,7 +17,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid file URL." }, { status: 400 });
   }
 
-  if (parsed.protocol !== "https:" || parsed.hostname !== ALLOWED_HOST) {
+  const projectHost = process.env.SUPABASE_URL
+    ? new URL(process.env.SUPABASE_URL).hostname
+    : "";
+  if (projectHost) ALLOWED_HOSTS.add(projectHost);
+
+  if (parsed.protocol !== "https:" || !ALLOWED_HOSTS.has(parsed.hostname)) {
     return NextResponse.json({ error: "Unsupported file host." }, { status: 400 });
   }
 
@@ -47,8 +52,7 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "private, max-age=0, no-cache",
       },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to stream file.";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.redirect(fileUrl, { status: 307 });
   }
 }
