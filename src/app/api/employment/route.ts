@@ -8,6 +8,20 @@ function getSupabase() {
     return createClient(url, key);
 }
 
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    if (error && typeof error === "object" && "message" in (error as Record<string, unknown>)) {
+        const msg = (error as Record<string, unknown>).message;
+        if (typeof msg === "string") return msg;
+    }
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return "Unknown error";
+    }
+}
+
 export async function GET() {
     try {
         const supabase = getSupabase();
@@ -18,7 +32,7 @@ export async function GET() {
         if (error) throw error;
         return NextResponse.json({ records: data ?? [] });
     } catch (error) {
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }
 
@@ -30,15 +44,6 @@ export async function POST(req: NextRequest) {
             .from("employment_certs")
             .insert({
                 crew_name: body.crewName,
-                rank: body.rank,
-                vessel_name: body.vesselName,
-                principal: body.principal,
-                contract_start: body.contractStart || null,
-                contract_end: body.contractEnd || null,
-                cert_number: body.certNumber,
-                issued_date: body.issuedDate || null,
-                issued_by: body.issuedBy,
-                remarks: body.remarks,
                 file_name: body.fileName,
                 file_url: body.fileUrl,
                 public_id: body.publicId,
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
         if (error) throw error;
         return NextResponse.json({ record: data });
     } catch (error) {
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }
 
@@ -60,15 +65,6 @@ export async function PUT(req: NextRequest) {
             .from("employment_certs")
             .update({
                 crew_name: body.crewName,
-                rank: body.rank,
-                vessel_name: body.vesselName,
-                principal: body.principal,
-                contract_start: body.contractStart || null,
-                contract_end: body.contractEnd || null,
-                cert_number: body.certNumber,
-                issued_date: body.issuedDate || null,
-                issued_by: body.issuedBy,
-                remarks: body.remarks,
                 file_name: body.fileName,
                 file_url: body.fileUrl,
                 public_id: body.publicId,
@@ -79,7 +75,7 @@ export async function PUT(req: NextRequest) {
         if (error) throw error;
         return NextResponse.json({ record: data });
     } catch (error) {
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }
 
@@ -94,6 +90,6 @@ export async function DELETE(req: NextRequest) {
         if (error) throw error;
         return NextResponse.json({ success: true });
     } catch (error) {
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }

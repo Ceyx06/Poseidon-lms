@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@supabase/supabase-js";
 
 export type CrewDocumentRecord = {
   id: string;
@@ -35,7 +35,45 @@ export type CrewDocumentPayload = {
 };
 
 function getDelegate() {
-  return (prisma as any).oWWARecord;
+  return null;
+}
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error("Missing Supabase env vars");
+  return createClient(url, key);
+}
+
+function parseDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toIsoOrNull(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+function mapRow(r: any): CrewDocumentRecord {
+  return {
+    id: String(r.id),
+    crewName: String(r.crewName ?? ""),
+    owwaStartDate: parseDate(r.owwaStartDate),
+    birthdate: parseDate(r.birthdate),
+    eRegNo: r.eRegNo ? String(r.eRegNo) : null,
+    dateProcessed: parseDate(r.dateProcessed),
+    dateDeployed: parseDate(r.dateDeployed),
+    statusTransaction: r.statusTransaction ? String(r.statusTransaction) : null,
+    oecNo: r.oecNo ? String(r.oecNo) : null,
+    rpfNo: r.rpfNo ? String(r.rpfNo) : null,
+    position: r.position ? String(r.position) : null,
+    vessel: r.vessel ? String(r.vessel) : null,
+    principal: r.principal ? String(r.principal) : null,
+    owwaRenewalDate: parseDate(r.owwaRenewalDate),
+    updatedAt: parseDate(r.updatedAt) ?? new Date(),
+  };
 }
 
 export function computeCrewExpiryDate(record: Pick<CrewDocumentRecord, "owwaRenewalDate" | "dateProcessed" | "oecNo">): Date | null {
@@ -76,136 +114,80 @@ export function computeCrewExpiryDate(record: Pick<CrewDocumentRecord, "owwaRene
 }
 
 export async function listCrewDocuments(): Promise<CrewDocumentRecord[]> {
-  const delegate = getDelegate();
-  if (delegate?.findMany) {
-    return delegate.findMany({ orderBy: { createdAt: "asc" } });
-  }
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("OWWARecord")
+    .select(
+      "id, crewName, owwaStartDate, birthdate, eRegNo, dateProcessed, dateDeployed, statusTransaction, oecNo, rpfNo, position, vessel, principal, owwaRenewalDate, updatedAt, createdAt"
+    )
+    .order("createdAt", { ascending: true });
 
-  try {
-    return await prisma.$queryRawUnsafe<CrewDocumentRecord[]>(`
-      SELECT
-        "id",
-        "crewName",
-        "owwaStartDate",
-        "birthdate",
-        "eRegNo",
-        "dateProcessed",
-        "dateDeployed",
-        "statusTransaction",
-        "oecNo",
-        "rpfNo",
-        "position",
-        "vessel",
-        "principal",
-        "owwaRenewalDate",
-        "updatedAt"
-      FROM "OWWARecord"
-      ORDER BY "createdAt" ASC
-    `);
-  } catch {
-    return [];
-  }
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapRow);
 }
 
 export async function createCrewDocument(data: CrewDocumentPayload): Promise<CrewDocumentRecord> {
-  const delegate = getDelegate();
-  if (delegate?.create) {
-    return delegate.create({ data });
-  }
+  const supabase = getSupabase();
+  const payload = {
+    crewName: data.crewName,
+    owwaStartDate: toIsoOrNull(data.owwaStartDate),
+    birthdate: toIsoOrNull(data.birthdate),
+    eRegNo: data.eRegNo,
+    dateProcessed: toIsoOrNull(data.dateProcessed),
+    dateDeployed: toIsoOrNull(data.dateDeployed),
+    statusTransaction: data.statusTransaction,
+    oecNo: data.oecNo,
+    rpfNo: data.rpfNo,
+    position: data.position,
+    vessel: data.vessel,
+    principal: data.principal,
+    owwaRenewalDate: toIsoOrNull(data.owwaRenewalDate),
+  };
 
-  const id = crypto.randomUUID();
-  const rows = await prisma.$queryRaw<CrewDocumentRecord[]>`
-    INSERT INTO "OWWARecord" (
-      "id",
-      "crewName",
-      "owwaStartDate",
-      "birthdate",
-      "eRegNo",
-      "dateProcessed",
-      "dateDeployed",
-      "statusTransaction",
-      "oecNo",
-      "rpfNo",
-      "position",
-      "vessel",
-      "principal",
-      "owwaRenewalDate",
-      "createdAt",
-      "updatedAt"
+  const { data: row, error } = await supabase
+    .from("OWWARecord")
+    .insert(payload)
+    .select(
+      "id, crewName, owwaStartDate, birthdate, eRegNo, dateProcessed, dateDeployed, statusTransaction, oecNo, rpfNo, position, vessel, principal, owwaRenewalDate, updatedAt"
     )
-    VALUES (
-      ${id},
-      ${data.crewName},
-      ${data.owwaStartDate},
-      ${data.birthdate},
-      ${data.eRegNo},
-      ${data.dateProcessed},
-      ${data.dateDeployed},
-      ${data.statusTransaction},
-      ${data.oecNo},
-      ${data.rpfNo},
-      ${data.position},
-      ${data.vessel},
-      ${data.principal},
-      ${data.owwaRenewalDate},
-      NOW(),
-      NOW()
-    )
-    RETURNING
-      "id",
-      "crewName",
-      "owwaStartDate",
-      "birthdate",
-      "eRegNo",
-      "dateProcessed",
-      "dateDeployed",
-      "statusTransaction",
-      "oecNo",
-      "rpfNo",
-      "position",
-      "vessel",
-      "principal",
-      "owwaRenewalDate",
-      "updatedAt"
-  `;
+    .single();
 
-  return rows[0];
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Insert failed");
+  return mapRow(row);
 }
 
 export async function updateCrewDocument(id: string, data: CrewDocumentPayload): Promise<void> {
-  const delegate = getDelegate();
-  if (delegate?.update) {
-    await delegate.update({ where: { id }, data });
-    return;
-  }
+  const supabase = getSupabase();
+  const payload = {
+    crewName: data.crewName,
+    owwaStartDate: toIsoOrNull(data.owwaStartDate),
+    birthdate: toIsoOrNull(data.birthdate),
+    eRegNo: data.eRegNo,
+    dateProcessed: toIsoOrNull(data.dateProcessed),
+    dateDeployed: toIsoOrNull(data.dateDeployed),
+    statusTransaction: data.statusTransaction,
+    oecNo: data.oecNo,
+    rpfNo: data.rpfNo,
+    position: data.position,
+    vessel: data.vessel,
+    principal: data.principal,
+    owwaRenewalDate: toIsoOrNull(data.owwaRenewalDate),
+    updatedAt: new Date().toISOString(),
+  };
 
-  await prisma.$executeRaw`
-    UPDATE "OWWARecord"
-    SET
-      "crewName" = ${data.crewName},
-      "owwaStartDate" = ${data.owwaStartDate},
-      "birthdate" = ${data.birthdate},
-      "eRegNo" = ${data.eRegNo},
-      "dateProcessed" = ${data.dateProcessed},
-      "dateDeployed" = ${data.dateDeployed},
-      "statusTransaction" = ${data.statusTransaction},
-      "oecNo" = ${data.oecNo},
-      "rpfNo" = ${data.rpfNo},
-      "position" = ${data.position},
-      "vessel" = ${data.vessel},
-      "principal" = ${data.principal},
-      "owwaRenewalDate" = ${data.owwaRenewalDate},
-      "updatedAt" = NOW()
-    WHERE "id" = ${id}
-  `;
+  const { error } = await supabase
+    .from("OWWARecord")
+    .update(payload)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteCrewDocument(id: string): Promise<void> {
-  const delegate = getDelegate();
-  if (delegate?.delete) {
-    await delegate.delete({ where: { id } });
-    return;
-  }
-
-  await prisma.$executeRaw`DELETE FROM "OWWARecord" WHERE "id" = ${id}`;
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("OWWARecord")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }
