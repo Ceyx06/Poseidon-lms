@@ -2,19 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 async function resolveProfileImageUrl(userId: string): Promise<string | null> {
-  const dir = path.join(process.cwd(), "public", "uploads", "profiles");
-  try {
-    const files = await fs.readdir(dir);
-    const profileFile = files.find((f) => f.startsWith(`${userId}.`));
-    if (!profileFile) return null;
-    return `/uploads/profiles/${profileFile}?v=${Date.now()}`;
-  } catch {
-    return null;
-  }
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloudName) return null;
+  return `https://res.cloudinary.com/${cloudName}/image/upload/poseidon-ims/profiles/profile_${userId}.jpg?v=${Date.now()}`;
 }
 
 export async function GET() {
