@@ -63,7 +63,7 @@ function toMessage(err: unknown): string {
   return "Unknown error";
 }
 
-// ── Folder SVG Icon ───────────────────────────────────────────────
+// ── Folder SVG Icon ───────────────────────────────────────────────────────────
 function FolderIcon({ color = "#b8841f", size = 56 }: { color?: string; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -74,7 +74,7 @@ function FolderIcon({ color = "#b8841f", size = 56 }: { color?: string; size?: n
   );
 }
 
-// ── Gmail Modal ───────────────────────────────────────────────────
+// ── Gmail Modal ───────────────────────────────────────────────────────────────
 function GmailModal({ selectedFiles, onClose }: { selectedFiles: CrewDocumentRecord[]; onClose: () => void }) {
   const [recipientInput, setRecipientInput] = useState("");
   const [recipients, setRecipients] = useState<string[]>([]);
@@ -115,53 +115,63 @@ function GmailModal({ selectedFiles, onClose }: { selectedFiles: CrewDocumentRec
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }} />
-      <div style={{ position: "relative", zIndex: 1001, background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, margin: "0 16px", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ position: "relative", zIndex: 1001, background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 520, margin: "0 16px", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" }}>
         {sent ? (
-          <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-            <h3 style={{ fontFamily: "var(--font-cinzel)", color: "#1a7a4a", margin: "0 0 8px" }}>Email Sent!</h3>
-            <p style={{ color: "#6a85a0", fontSize: 13 }}>{selectedFiles.length} file(s) sent to {recipients.length} recipient(s)</p>
-            <button onClick={onClose} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 10, background: "linear-gradient(135deg,#1a7a4a,#27ae60)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>Done</button>
+          <div style={{ textAlign: "center", padding: "32px 0" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#edfff5,#dcfce7)", border: "2px solid #bbf7d0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✅</div>
+            <h3 style={{ fontFamily: "var(--font-cinzel)", color: "#1a7a4a", margin: "0 0 8px", fontSize: 18 }}>Email Sent!</h3>
+            <p style={{ color: "#6a85a0", fontSize: 13, margin: "0 0 20px" }}>{selectedFiles.length} file(s) sent successfully</p>
+            <button onClick={onClose} style={{ padding: "11px 28px", borderRadius: 10, background: "linear-gradient(135deg,#1a7a4a,#27ae60)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 13 }}>Done</button>
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 16, color: "#102a43" }}>Send via Gmail</h3>
-              <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 999, border: "1px solid #d0dce8", background: "#f8fafc", cursor: "pointer", fontSize: 14 }}>✕</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: "0 0 2px", fontFamily: "var(--font-cinzel)", fontSize: 17, color: "#0f2742" }}>Send via Gmail</h3>
+                <p style={{ margin: 0, fontSize: 12, color: "#8a9bb0" }}>{selectedFiles.length} file{selectedFiles.length > 1 ? "s" : ""} ready to send</p>
+              </div>
+              <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 999, border: "1px solid #e2eaf4", background: "#f8fafc", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", color: "#5a6f86" }}>✕</button>
             </div>
-            <div style={{ marginBottom: 14, background: "#f5f8fc", borderRadius: 10, padding: 10, border: "1px solid #e3ebf4", maxHeight: 130, overflowY: "auto" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontFamily: "var(--font-cinzel)", textTransform: "uppercase", color: "#6a85a0", fontWeight: 700 }}>{selectedFiles.length} file(s) to send</p>
+
+            {/* Files preview */}
+            <div style={{ marginBottom: 16, background: "#f8fbff", borderRadius: 12, padding: "10px 12px", border: "1px solid #e3ebf4", maxHeight: 120, overflowY: "auto" }}>
               {selectedFiles.map((f) => (
-                <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid #edf2f7" }}>
-                  <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#1d4ed8", background: "#eaf1ff", borderRadius: 4, padding: "2px 6px" }}>{getFileIcon(f.fileName)}</span>
+                <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #edf2f7" }}>
+                  <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#1d4ed8", background: "#eaf1ff", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{getFileIcon(f.fileName)}</span>
                   <span style={{ fontSize: 12, color: "#102a43", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</span>
-                  <span style={{ fontSize: 11, color: "#6a85a0" }}>{f.crewName}</span>
+                  <span style={{ fontSize: 11, color: "#8a9bb0", flexShrink: 0 }}>{f.crewName}</span>
                 </div>
               ))}
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                Recipients * <span style={{ fontSize: 10, color: "#1a6bbf", textTransform: "none", fontFamily: "var(--font-dm)", letterSpacing: 0 }}>(Enter or comma to add)</span>
+
+            {/* Recipients */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                Recipients <span style={{ fontSize: 10, color: "#1a6bbf", textTransform: "none", fontFamily: "var(--font-dm)", letterSpacing: 0, fontWeight: 400 }}>(Enter or comma to add)</span>
               </label>
               {recipients.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {recipients.map((email) => (
-                    <span key={email} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eaf1ff", border: "1px solid #cfe0ff", borderRadius: 999, padding: "3px 10px", fontSize: 12, color: "#1d4ed8" }}>
+                    <span key={email} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eaf1ff", border: "1px solid #cfe0ff", borderRadius: 999, padding: "4px 12px", fontSize: 12, color: "#1d4ed8" }}>
                       {email}
-                      <button onClick={() => setRecipients((p) => p.filter((r) => r !== email))} style={{ background: "none", border: "none", cursor: "pointer", color: "#6a85a0", fontSize: 13, padding: 0 }}>×</button>
+                      <button onClick={() => setRecipients((p) => p.filter((r) => r !== email))} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a9bb0", fontSize: 14, padding: 0, lineHeight: 1 }}>×</button>
                     </span>
                   ))}
                 </div>
               )}
-              <input type="email" value={recipientInput} onChange={(e) => { setRecipientInput(e.target.value); setError(""); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addRecipient(); } }} onBlur={addRecipient} placeholder="email@example.com" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+              <input type="email" value={recipientInput} onChange={(e) => { setRecipientInput(e.target.value); setError(""); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addRecipient(); } }} onBlur={addRecipient} placeholder="email@example.com" style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, boxSizing: "border-box", outline: "none", background: "#f8fbff" }} />
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Message (optional)</label>
-              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Add a message..." rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none" }} />
+
+            {/* Message */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Message (optional)</label>
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Add a message..." rows={3} style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, boxSizing: "border-box", resize: "vertical", outline: "none", background: "#f8fbff" }} />
             </div>
-            {error && <p style={{ margin: "0 0 12px", fontSize: 12, color: "#c0392b" }}>{error}</p>}
-            <button onClick={handleSend} disabled={sending} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, background: sending ? "#e0e8f0" : "linear-gradient(135deg,#EA4335,#ff6b5b)", color: sending ? "#9aa8b6" : "#fff", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 13 }}>
-              {sending ? "Sending..." : `Send to ${recipients.length || 1} Recipient${recipients.length > 1 ? "s" : ""} · ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
+
+            {error && <p style={{ margin: "0 0 14px", fontSize: 12, color: "#c0392b", background: "#fff5f5", padding: "8px 12px", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</p>}
+
+            <button onClick={handleSend} disabled={sending} style={{ width: "100%", padding: "13px", borderRadius: 12, background: sending ? "#e8eef5" : "linear-gradient(135deg,#EA4335,#ff6b5b)", color: sending ? "#9aa8b6" : "#fff", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>
+              {sending ? "Sending..." : `Send · ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}`}
             </button>
           </>
         )}
@@ -170,7 +180,7 @@ function GmailModal({ selectedFiles, onClose }: { selectedFiles: CrewDocumentRec
   );
 }
 
-// ── Folder Side Panel ─────────────────────────────────────────────
+// ── Folder Side Panel ─────────────────────────────────────────────────────────
 function FolderPanel({
   folder, onClose, checkedIds, toggleCheck, toggleFolderCheck,
   deletingIds, handleDelete, setCheckedIds, setShowGmail,
@@ -195,65 +205,76 @@ function FolderPanel({
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 900, display: "flex" }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(10,25,45,0.52)", backdropFilter: "blur(4px)" }} />
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "min(800px, 96vw)", background: "#fff", boxShadow: "-10px 0 50px rgba(10,25,45,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(10,25,45,0.55)", backdropFilter: "blur(4px)" }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "min(820px, 96vw)", background: "#f8fafc", boxShadow: "-12px 0 60px rgba(10,25,45,0.18)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* Panel header */}
-        <div style={{ background: "linear-gradient(135deg,#0f2742,#1a3a5c)", padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-          <FolderIcon color="#e8b84b" size={46} />
+        <div style={{ background: "linear-gradient(135deg,#0f2742 0%,#1a3a5c 100%)", padding: "20px 28px", display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(232,184,75,0.15)", border: "1px solid rgba(232,184,75,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <FolderIcon color="#e8b84b" size={34} />
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>Crew Folder</p>
-            <h2 style={{ margin: "2px 0 0", fontFamily: "var(--font-cinzel)", fontSize: 19, color: "#fff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ margin: 0, fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700 }}>Crew Folder</p>
+            <h2 style={{ margin: "3px 0 0", fontFamily: "var(--font-cinzel)", fontSize: 20, color: "#fff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {folder.crewName}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <span style={{ background: "rgba(232,184,75,0.18)", border: "1px solid rgba(232,184,75,0.32)", borderRadius: 999, padding: "4px 12px", fontSize: 12, color: "#e8b84b", fontWeight: 700 }}>
+            <span style={{ background: "rgba(232,184,75,0.15)", border: "1px solid rgba(232,184,75,0.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, color: "#e8b84b", fontWeight: 700 }}>
               {folder.files.length} file{folder.files.length !== 1 ? "s" : ""}
             </span>
-            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
         </div>
 
         {/* Toolbar */}
-        <div style={{ padding: "12px 24px", borderBottom: "1px solid #e8eef5", background: "#f8fbff", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
-          <input
-            id={`folder-file-${folder.crewKey}`}
-            type="file" multiple accept={ACCEPTED_UPLOAD_TYPES}
-            onChange={(e) => setFolderSelectedFiles((prev) => ({ ...prev, [folder.crewKey]: Array.from(e.target.files ?? []) }))}
-            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #c8d6e5", fontSize: 12, color: "#102a43", background: "#fff", cursor: "pointer" }}
-          />
+        <div style={{ padding: "14px 28px", borderBottom: "1px solid #e2eaf4", background: "#fff", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 9, border: "1px solid #d0dce8", background: "#f8fbff", cursor: "pointer", fontSize: 12, color: "#4a5568", fontWeight: 600 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="#1a6bbf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Choose Files
+            <input
+              id={`folder-file-${folder.crewKey}`}
+              type="file" multiple accept={ACCEPTED_UPLOAD_TYPES}
+              onChange={(e) => setFolderSelectedFiles((prev) => ({ ...prev, [folder.crewKey]: Array.from(e.target.files ?? []) }))}
+              style={{ display: "none" }}
+            />
+          </label>
+
           {(folderSelectedFiles[folder.crewKey]?.length ?? 0) > 0 && (
-            <span style={{ fontSize: 11, color: "#1a6bbf", fontWeight: 700 }}>{folderSelectedFiles[folder.crewKey].length} ready</span>
+            <span style={{ fontSize: 11, color: "#1a6bbf", fontWeight: 700, background: "#eef4ff", border: "1px solid #bfdbfe", borderRadius: 999, padding: "4px 10px" }}>
+              {folderSelectedFiles[folder.crewKey].length} file{folderSelectedFiles[folder.crewKey].length > 1 ? "s" : ""} ready
+            </span>
           )}
+
           <button type="button" onClick={() => handleFolderUpload(folder.crewName, folder.crewKey)} disabled={folderUploading[folder.crewKey]}
-            style={{ padding: "9px 14px", borderRadius: 8, background: folderUploading[folder.crewKey] ? "#e0e8f0" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: folderUploading[folder.crewKey] ? "#a0b0c0" : "#fff", border: "none", cursor: folderUploading[folder.crewKey] ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}>
+            style={{ padding: "9px 16px", borderRadius: 9, background: folderUploading[folder.crewKey] ? "#e8eef5" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: folderUploading[folder.crewKey] ? "#9aa8b6" : "#fff", border: "none", cursor: folderUploading[folder.crewKey] ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11, letterSpacing: "0.03em" }}>
             {folderUploading[folder.crewKey] ? "Uploading..." : "Upload to Folder"}
           </button>
 
           {someChecked && (
             <>
-              <button onClick={() => setShowGmail(true)} style={{ padding: "9px 14px", borderRadius: 8, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11 }}>
-                ✉️ Gmail
+              <button onClick={() => setShowGmail(true)} style={{ padding: "9px 14px", borderRadius: 9, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#fff" strokeWidth="2"/><polyline points="22,6 12,13 2,6" stroke="#fff" strokeWidth="2"/></svg>
+                Gmail
               </button>
-              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "9px 10px", borderRadius: 8, background: "#fff", color: "#5a6f86", border: "1px solid #d0dce8", cursor: "pointer", fontSize: 11 }}>
+              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "9px 12px", borderRadius: 9, background: "#f5f8fc", color: "#5a6f86", border: "1px solid #d0dce8", cursor: "pointer", fontSize: 11 }}>
                 Clear
               </button>
             </>
           )}
 
           <button type="button" onClick={() => toggleFolderCheck(folder.files)}
-            style={{ padding: "9px 12px", borderRadius: 8, background: allChecked ? "#edfff5" : "#f5f8fc", color: allChecked ? "#1a7a4a" : "#5a6f86", border: `1px solid ${allChecked ? "rgba(26,122,74,0.3)" : "#d0dce8"}`, cursor: "pointer", fontSize: 11, fontWeight: 700, marginLeft: "auto" }}>
+            style={{ padding: "9px 14px", borderRadius: 9, background: allChecked ? "#edfff5" : "#f5f8fc", color: allChecked ? "#1a7a4a" : "#5a6f86", border: `1px solid ${allChecked ? "rgba(26,122,74,0.25)" : "#d0dce8"}`, cursor: "pointer", fontSize: 11, fontWeight: 700, marginLeft: "auto" }}>
             {allChecked ? "✓ All Selected" : "Select All"}
           </button>
         </div>
 
-        {/* Files */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+        {/* Files list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
           {folder.files.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: "#7a8fa5", border: "1px dashed #d4e0ec", borderRadius: 12, background: "#f9fcff" }}>
-              <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.4 }}>📄</div>
-              <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 14, color: "#17324d" }}>No files yet</p>
+            <div style={{ textAlign: "center", padding: "56px 20px", color: "#7a8fa5", border: "2px dashed #d4e0ec", borderRadius: 16, background: "#fff" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f0f4f8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>📄</div>
+              <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 15, color: "#17324d", fontWeight: 700 }}>No files yet</p>
               <p style={{ margin: "6px 0 0", fontSize: 13 }}>Upload files using the toolbar above.</p>
             </div>
           ) : (
@@ -262,20 +283,20 @@ function FolderPanel({
                 const { color, bg } = getFileIconColor(file.fileName);
                 const isChecked = checkedIds.has(file.id);
                 return (
-                  <div key={file.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${isChecked ? "#bfdbfe" : "#e8eef5"}`, background: isChecked ? "#f0f7ff" : index % 2 === 0 ? "#fff" : "#fbfdff" }}>
+                  <div key={file.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", borderRadius: 12, border: `1px solid ${isChecked ? "#bfdbfe" : "#e8eef5"}`, background: isChecked ? "#f0f7ff" : "#fff", boxShadow: "0 1px 4px rgba(15,39,66,0.04)", transition: "border-color 0.15s" }}>
                     <input type="checkbox" checked={isChecked} onChange={() => toggleCheck(file.id)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#1a6bbf", flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, fontFamily: "var(--font-cinzel)", fontWeight: 700, color, background: bg, borderRadius: 6, padding: "3px 8px", flexShrink: 0 }}>
-                      {getFileIcon(file.fileName)}
-                    </span>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: 9, fontFamily: "var(--font-cinzel)", fontWeight: 700, color }}>{getFileIcon(file.fileName)}</span>
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: 13, color: "#102a43", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.fileName}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#7a8fa5" }}>{file.fileSize} · {file.uploadedAt}</p>
+                      <p style={{ margin: "3px 0 0", fontSize: 11, color: "#8a9ab5" }}>{file.fileSize} · {file.uploadedAt}</p>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <a href={getOpenFileUrl(file)} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none", padding: "5px 10px", borderRadius: 6, background: "#eaf1ff", border: "1px solid #cfe0ff", fontWeight: 700 }}>Open</a>
-                      <button type="button" onClick={() => { setCheckedIds(new Set([file.id])); setShowGmail(true); }} style={{ fontSize: 11, color: "#EA4335", padding: "5px 10px", borderRadius: 6, background: "#fff1f0", border: "1px solid #ffc5c2", fontWeight: 700, cursor: "pointer" }}>Gmail</button>
-                      <button type="button" onClick={() => handleDelete(file)} disabled={deletingIds[file.id]} style={{ fontSize: 11, color: deletingIds[file.id] ? "#9ca7b5" : "#c0392b", padding: "5px 10px", borderRadius: 6, background: deletingIds[file.id] ? "#f0f4f8" : "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.2)", fontWeight: 700, cursor: deletingIds[file.id] ? "not-allowed" : "pointer" }}>
-                        {deletingIds[file.id] ? "..." : "Delete"}
+                      <a href={getOpenFileUrl(file)} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#1d4ed8", textDecoration: "none", padding: "6px 11px", borderRadius: 7, background: "#eaf1ff", border: "1px solid #cfe0ff", fontWeight: 700 }}>Open</a>
+                      <button type="button" onClick={() => { setCheckedIds(new Set([file.id])); setShowGmail(true); }} style={{ fontSize: 11, color: "#EA4335", padding: "6px 11px", borderRadius: 7, background: "#fff1f0", border: "1px solid #ffc5c2", fontWeight: 700, cursor: "pointer" }}>Gmail</button>
+                      <button type="button" onClick={() => handleDelete(file)} disabled={deletingIds[file.id]} style={{ fontSize: 11, color: deletingIds[file.id] ? "#9ca7b5" : "#c0392b", padding: "6px 11px", borderRadius: 7, background: deletingIds[file.id] ? "#f0f4f8" : "#fff5f5", border: `1px solid ${deletingIds[file.id] ? "#e2eaf4" : "rgba(192,57,43,0.2)"}`, fontWeight: 700, cursor: deletingIds[file.id] ? "not-allowed" : "pointer" }}>
+                        {deletingIds[file.id] ? "···" : "Delete"}
                       </button>
                     </div>
                   </div>
@@ -289,7 +310,7 @@ function FolderPanel({
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CrewDocumentsPage() {
   const [crewName, setCrewName] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -443,19 +464,22 @@ export default function CrewDocumentsPage() {
 
   if (loading)
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 10 }}>
-        <div style={{ width: 36, height: 36, border: "3px solid #e8eef5", borderTop: "3px solid #b8841f", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 12 }}>
+        <div style={{ width: 40, height: 40, border: "3px solid #e8eef5", borderTop: "3px solid #b8841f", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <p style={{ margin: 0, color: "#6a85a0", fontSize: 14 }}>Loading documents...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
 
   return (
-    <div style={{ fontFamily: "var(--font-dm)", background: "linear-gradient(180deg,#f6f9fc 0%,#fff 55%,#f8fafc 100%)", minHeight: "100vh", padding: 22 }}>
+    <div style={{ fontFamily: "var(--font-dm)", background: "linear-gradient(160deg,#f4f8fd 0%,#f8fafc 60%,#eef4ff 100%)", minHeight: "100vh", padding: "28px 32px" }}>
       <style>{`
-        .folder-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
-        .folder-card:hover { transform: translateY(-5px) !important; box-shadow: 0 16px 36px rgba(15,39,66,0.16) !important; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        .folder-card { transition: transform 0.18s ease, box-shadow 0.18s ease; animation: fadeUp 0.4s ease both; }
+        .folder-card:hover { transform: translateY(-6px) !important; box-shadow: 0 20px 40px rgba(15,39,66,0.14) !important; }
         .folder-card:active { transform: translateY(-2px) !important; }
+        .upload-card { animation: fadeUp 0.4s ease 0.1s both; }
+        .search-bar { animation: fadeUp 0.4s ease 0.15s both; }
       `}</style>
 
       {showGmail && selectedDocuments.length > 0 && (
@@ -473,108 +497,162 @@ export default function CrewDocumentsPage() {
         />
       )}
 
-      <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7c93", fontWeight: 700 }}>Coordinator Workspace</p>
-          <h1 style={{ margin: "6px 0 4px", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 28, color: "#0f2742" }}>Crew Documents</h1>
+      <div style={{ maxWidth: 1160, margin: "0 auto" }}>
+
+        {/* ── Header ── */}
+        <div style={{ marginBottom: 28, animation: "fadeUp 0.4s ease both" }}>
+          <p style={{ margin: "0 0 4px", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7a8fa5", fontWeight: 700 }}>Coordinator Workspace</p>
+          <h1 style={{ margin: "0 0 6px", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 28, color: "#0f2742" }}>Crew Documents</h1>
           <p style={{ margin: 0, fontSize: 14, color: "#5a6f86" }}>Click any folder to view and manage its files.</p>
         </div>
 
         {loadError && (
-          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412", fontSize: 13 }}>
-            Documents could not be loaded: {loadError}
+          <div style={{ marginBottom: 18, padding: "13px 16px", borderRadius: 12, background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412", fontSize: 13, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>⚠️</span> {loadError}
           </div>
         )}
 
-        {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 18 }}>
+        {/* ── Stats ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24, animation: "fadeUp 0.4s ease 0.05s both" }}>
           {[
-            { label: "Total Folders", value: new Set(records.map((r) => r.crewKey)).size, accent: "#1a6bbf", bg: "#eef4ff" },
-            { label: "Total Files", value: records.length, accent: "#1a7a4a", bg: "#edfff5" },
-            { label: "Filtered", value: folders.length, accent: "#c9972a", bg: "#fdfbea" },
+            {
+              label: "Total Folders", value: new Set(records.map((r) => r.crewKey)).size,
+              accent: "#1a6bbf", bg: "linear-gradient(135deg,#eef4ff,#dbeafe)", border: "#bfdbfe",
+              icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="#1a6bbf" strokeWidth="1.8" fill="#1a6bbf" fillOpacity="0.12"/></svg>
+            },
+            {
+              label: "Total Files", value: records.length,
+              accent: "#1a7a4a", bg: "linear-gradient(135deg,#edfff5,#dcfce7)", border: "#bbf7d0",
+              icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="10" height="14" rx="2" fill="#1a7a4a" fillOpacity="0.15"/><rect x="8" y="6" width="10" height="14" rx="2" fill="#1a7a4a" fillOpacity="0.5" stroke="#1a7a4a" strokeWidth="1.5"/></svg>
+            },
+            {
+              label: "Showing", value: folders.length,
+              accent: "#b45309", bg: "linear-gradient(135deg,#fdfbea,#fef9c3)", border: "#fde68a",
+              icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#b45309" strokeWidth="1.8" fill="#b45309" fillOpacity="0.1"/><path d="M16.5 16.5L21 21" stroke="#b45309" strokeWidth="2" strokeLinecap="round"/></svg>
+            },
           ].map((c) => (
-            <div key={c.label} style={{ border: "1px solid #e8eef5", background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 6px 16px rgba(26,45,69,0.06)" }}>
-              <p style={{ margin: 0, fontSize: 11, color: "#6a7f95", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>{c.label}</p>
-              <p style={{ margin: "4px 0 0", fontSize: 28, lineHeight: 1.1, color: c.accent, fontWeight: 700, fontFamily: "var(--font-cinzel)", background: c.bg, borderRadius: 8, display: "inline-block", padding: "4px 10px" }}>{c.value}</p>
+            <div key={c.label} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 16, padding: "18px 22px", boxShadow: "0 4px 16px rgba(15,39,66,0.06)", display: "flex", alignItems: "center", gap: 16, position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", right: -12, top: -12, width: 72, height: 72, borderRadius: "50%", background: c.accent, opacity: 0.06 }} />
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 2px 8px ${c.border}` }}>
+                {c.icon}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, color: c.accent, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, opacity: 0.8 }}>{c.label}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 32, lineHeight: 1.1, color: c.accent, fontWeight: 700, fontFamily: "var(--font-cinzel)" }}>{c.value}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Global selection bar */}
+        {/* ── Global selection bar ── */}
         {checkedIds.size > 0 && (
-          <div style={{ background: "linear-gradient(135deg,#1a2d45,#0f2742)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 4px 16px rgba(15,39,66,0.2)" }}>
-            <p style={{ margin: 0, color: "#fff", fontSize: 13, fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>📎 {checkedIds.size} file{checkedIds.size > 1 ? "s" : ""} selected</p>
+          <div style={{ background: "linear-gradient(135deg,#0f2742,#1a3a5c)", borderRadius: 14, padding: "13px 20px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 6px 20px rgba(15,39,66,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📎</div>
+              <p style={{ margin: 0, color: "#fff", fontSize: 13, fontFamily: "var(--font-cinzel)", fontWeight: 700 }}>{checkedIds.size} file{checkedIds.size > 1 ? "s" : ""} selected</p>
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setShowGmail(true)} style={{ padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}>✉️ Send via Gmail</button>
-              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 12 }}>Clear</button>
+              <button onClick={() => setShowGmail(true)} style={{ padding: "8px 18px", borderRadius: 9, background: "linear-gradient(135deg,#EA4335,#ff6b5b)", color: "#fff", border: "none", cursor: "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}>✉️ Send via Gmail</button>
+              <button onClick={() => setCheckedIds(new Set())} style={{ padding: "8px 14px", borderRadius: 9, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", fontSize: 12 }}>Clear</button>
             </div>
           </div>
         )}
 
-        {/* New Folder Upload */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(201,151,42,0.25)", padding: 20, marginBottom: 20, boxShadow: "0 8px 18px rgba(201,151,42,0.08)" }}>
-          <h3 style={{ fontFamily: "var(--font-cinzel)", fontSize: 14, fontWeight: 700, color: "#102a43", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.08em" }}>New Folder Upload</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 14, marginBottom: 12 }}>
+        {/* ── Upload card ── */}
+        <div className="upload-card" style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8c97a40", padding: "22px 24px", marginBottom: 22, boxShadow: "0 4px 24px rgba(184,132,31,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,#fdfbea,#fef9c3)", border: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#b8841f" strokeWidth="2.2" strokeLinecap="round"/></svg>
+            </div>
+            <h3 style={{ fontFamily: "var(--font-cinzel)", fontSize: 13, fontWeight: 700, color: "#102a43", margin: 0, textTransform: "uppercase", letterSpacing: "0.08em" }}>New Folder Upload</h3>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Crew Name *</label>
-              <input value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Enter full crew name" style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", outline: "none", boxSizing: "border-box" }} />
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7 }}>Crew Name *</label>
+              <input value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Enter full crew name"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, color: "#102a43", background: "#f8fbff", outline: "none", boxSizing: "border-box", transition: "border-color 0.15s" }}
+                onFocus={(e) => e.currentTarget.style.borderColor = "#b8841f"}
+                onBlur={(e) => e.currentTarget.style.borderColor = "#d0dce8"}
+              />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                Document Files * <span style={{ fontSize: 10, color: "#1a6bbf", fontFamily: "var(--font-dm)", textTransform: "none", letterSpacing: 0 }}>(select multiple)</span>
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: "#5f6b7a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7 }}>
+                Files * <span style={{ fontSize: 10, color: "#1a6bbf", textTransform: "none", fontFamily: "var(--font-dm)", letterSpacing: 0, fontWeight: 400 }}>(select multiple)</span>
               </label>
-              <input id="crewDocumentFile" type="file" multiple accept={ACCEPTED_UPLOAD_TYPES} onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #c8d6e5", fontSize: 13, color: "#102a43", background: "#f8fbff", boxSizing: "border-box", cursor: "pointer" }} />
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", background: "#f8fbff", cursor: "pointer", fontSize: 13, color: selectedFiles.length ? "#102a43" : "#8a9bb0", boxSizing: "border-box" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="#1a6bbf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {selectedFiles.length > 0 ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} selected` : "Choose files…"}
+                <input id="crewDocumentFile" type="file" multiple accept={ACCEPTED_UPLOAD_TYPES} onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))} style={{ display: "none" }} />
+              </label>
             </div>
           </div>
 
+          {/* Selected files preview */}
           {selectedFiles.length > 0 && (
-            <div style={{ marginBottom: 12, border: "1px solid #d4e3fb", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ marginBottom: 16, border: "1px solid #dbeafe", borderRadius: 10, overflow: "hidden" }}>
               {selectedFiles.map((file, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: i % 2 === 0 ? "#f2f7ff" : "#eef4ff", borderBottom: i < selectedFiles.length - 1 ? "1px solid #dce8fb" : "none" }}>
-                  <span style={{ fontFamily: "var(--font-cinzel)", fontSize: 10, fontWeight: 700, color: "#1d4ed8", background: "#dbeafe", borderRadius: 4, padding: "2px 6px" }}>{getFileIcon(file.name)}</span>
-                  <p style={{ margin: 0, fontSize: 12, color: "#102a43", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: "#5a6f86", whiteSpace: "nowrap" }}>{formatFileSize(file.size)}</p>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: i % 2 === 0 ? "#f8fbff" : "#f0f6ff", borderBottom: i < selectedFiles.length - 1 ? "1px solid #e2eaf4" : "none" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: getFileIconColor(file.name).bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 8, fontFamily: "var(--font-cinzel)", fontWeight: 700, color: getFileIconColor(file.name).color }}>{getFileIcon(file.name)}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: "#102a43", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{file.name}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "#8a9bb0", whiteSpace: "nowrap" }}>{formatFileSize(file.size)}</p>
                 </div>
               ))}
             </div>
           )}
 
+          {/* Progress bar */}
           {uploadProgress && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#5a6f86" }}>Uploading {uploadProgress.done} of {uploadProgress.total}...</span>
-                <span style={{ fontSize: 12, color: "#1a6bbf", fontWeight: 700 }}>{Math.round((uploadProgress.done / uploadProgress.total) * 100)}%</span>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "#5a6f86", fontWeight: 500 }}>Uploading {uploadProgress.done} of {uploadProgress.total}…</span>
+                <span style={{ fontSize: 12, color: "#b8841f", fontWeight: 700 }}>{Math.round((uploadProgress.done / uploadProgress.total) * 100)}%</span>
               </div>
               <div style={{ height: 6, borderRadius: 999, background: "#e8eef5", overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#1a6bbf,#4d9de0)", width: `${(uploadProgress.done / uploadProgress.total) * 100}%`, transition: "width 0.3s ease" }} />
+                <div style={{ height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#b8841f,#e8b84b)", width: `${(uploadProgress.done / uploadProgress.total) * 100}%`, transition: "width 0.3s ease" }} />
               </div>
             </div>
           )}
 
-          <button onClick={handleUpload} disabled={uploading} style={{ padding: "10px 16px", borderRadius: 10, background: uploading ? "#e0e8f0" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: uploading ? "#a0b0c0" : "#fff", border: "none", cursor: uploading ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12 }}>
-            {uploading ? `Uploading ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}...` : `Create Folder + Upload${selectedFiles.length > 1 ? ` (${selectedFiles.length} files)` : ""}`}
+          <button onClick={handleUpload} disabled={uploading} style={{ padding: "11px 20px", borderRadius: 11, background: uploading ? "#e8eef5" : "linear-gradient(135deg,#b8841f,#e8b84b)", color: uploading ? "#9aa8b6" : "#fff", border: "none", cursor: uploading ? "not-allowed" : "pointer", fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 12, letterSpacing: "0.03em", boxShadow: uploading ? "none" : "0 4px 14px rgba(184,132,31,0.3)" }}>
+            {uploading ? `Uploading ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? 0}…` : `Create Folder + Upload${selectedFiles.length > 1 ? ` (${selectedFiles.length} files)` : ""}`}
           </button>
         </div>
 
-        {/* Search */}
-        <div style={{ marginBottom: 16 }}>
+        {/* ── Search ── */}
+        <div className="search-bar" style={{ marginBottom: 20, position: "relative" }}>
+          <div style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#8a9bb0" strokeWidth="2"/><path d="M16.5 16.5L21 21" stroke="#8a9bb0" strokeWidth="2" strokeLinecap="round"/></svg>
+          </div>
           <input
-            placeholder="Search folders by crew name..."
+            placeholder="Search folders by crew name…"
             value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #d0dce8", fontSize: 13, color: "#102a43", background: "#fff", outline: "none", boxSizing: "border-box", boxShadow: "0 2px 8px rgba(15,39,66,0.05)" }}
+            style={{ width: "100%", padding: "12px 16px 12px 44px", borderRadius: 12, border: "1px solid #d8e4f0", fontSize: 13, color: "#102a43", background: "#fff", outline: "none", boxSizing: "border-box", boxShadow: "0 2px 8px rgba(15,39,66,0.05)", transition: "border-color 0.15s, box-shadow 0.15s" }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "#b8841f"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(184,132,31,0.1)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = "#d8e4f0"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,39,66,0.05)"; }}
           />
+          {search && (
+            <button onClick={() => setSearch("")} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "#e8eef5", border: "none", borderRadius: 999, width: 22, height: 22, cursor: "pointer", fontSize: 11, color: "#5a6f86", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          )}
         </div>
 
-        {/* Folder grid */}
+        {/* ── Folder grid ── */}
         {folders.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "64px 20px", color: "#7a8fa5", border: "1px dashed #d4e0ec", borderRadius: 14, background: "#f9fcff" }}>
-            <div style={{ fontSize: 52, marginBottom: 12, opacity: 0.35 }}>📁</div>
-            <p style={{ fontSize: 15, fontFamily: "var(--font-cinzel)", color: "#17324d", margin: "0 0 6px" }}>No documents uploaded yet</p>
-            <p style={{ fontSize: 13, margin: 0 }}>Create a folder above to get started.</p>
+          <div style={{ textAlign: "center", padding: "72px 20px", color: "#7a8fa5", border: "2px dashed #d4e0ec", borderRadius: 18, background: "#fff" }}>
+            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "linear-gradient(135deg,#f0f4f8,#e8eef5)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+              <FolderIcon color="#b0c0d4" size={44} />
+            </div>
+            <p style={{ fontSize: 16, fontFamily: "var(--font-cinzel)", color: "#17324d", margin: "0 0 8px", fontWeight: 700 }}>
+              {search ? "No folders match your search." : "No documents uploaded yet"}
+            </p>
+            <p style={{ fontSize: 13, margin: 0, color: "#8a9bb0" }}>
+              {search ? "Try a different search term." : "Create a folder above to get started."}
+            </p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(156px, 1fr))", gap: 14 }}>
             {folders.map((folder, idx) => {
               const color = FOLDER_COLORS[idx % FOLDER_COLORS.length];
               const someChecked = folder.files.some((f) => checkedIds.has(f.id));
@@ -584,13 +662,14 @@ export default function CrewDocumentsPage() {
                   className="folder-card"
                   onClick={() => setOpenFolderKey(folder.crewKey)}
                   style={{
+                    animationDelay: `${0.05 + idx * 0.03}s`,
                     background: "#fff",
-                    border: `1.5px solid ${someChecked ? "#93c5fd" : "#e2eaf4"}`,
-                    borderRadius: 14,
-                    padding: "20px 14px 16px",
+                    border: `1.5px solid ${someChecked ? "#93c5fd" : "#e8eef5"}`,
+                    borderRadius: 16,
+                    padding: "22px 14px 18px",
                     boxShadow: someChecked
-                      ? "0 0 0 3px rgba(147,197,253,0.35), 0 4px 14px rgba(15,39,66,0.08)"
-                      : "0 4px 14px rgba(15,39,66,0.07)",
+                      ? "0 0 0 3px rgba(147,197,253,0.3), 0 4px 16px rgba(15,39,66,0.08)"
+                      : "0 2px 10px rgba(15,39,66,0.06)",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -600,12 +679,22 @@ export default function CrewDocumentsPage() {
                     userSelect: "none",
                   }}
                 >
+                  {/* Selection indicator */}
                   {someChecked && (
-                    <div style={{ position: "absolute", top: 10, right: 10, width: 9, height: 9, borderRadius: 999, background: "#1a6bbf", boxShadow: "0 0 0 2px #fff" }} />
+                    <div style={{ position: "absolute", top: 10, right: 10, width: 10, height: 10, borderRadius: 999, background: "#1a6bbf", boxShadow: "0 0 0 2px #fff, 0 0 0 3.5px #93c5fd" }} />
                   )}
-                  <FolderIcon color={color} size={62} />
+
+                  {/* Folder count badge */}
+                  <div style={{ position: "absolute", top: 10, left: 10, background: `${color}18`, border: `1px solid ${color}30`, borderRadius: 999, padding: "2px 8px", fontSize: 10, color, fontWeight: 700, fontFamily: "var(--font-cinzel)" }}>
+                    {folder.files.length}
+                  </div>
+
+                  <div style={{ marginTop: 8 }}>
+                    <FolderIcon color={color} size={64} />
+                  </div>
+
                   <div style={{ textAlign: "center", width: "100%" }}>
-                    <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 12, fontWeight: 700, color: "#102a43", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ margin: 0, fontFamily: "var(--font-cinzel)", fontSize: 12, fontWeight: 700, color: "#0f2742", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3 }}>
                       {folder.crewName}
                     </p>
                     <p style={{ margin: "4px 0 0", fontSize: 11, color: "#8a9ab5" }}>
