@@ -55,24 +55,6 @@ export default function TopBar({ user }: TopBarProps) {
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          padding: "4px 12px",
-          borderRadius: "999px",
-          background: "rgba(16,184,164,0.08)",
-          border: "1px solid rgba(16,184,164,0.2)",
-        }}>
-          <div style={{
-            width: "6px",
-            height: "6px",
-            borderRadius: "50%",
-            background: "#10b8a4",
-          }} />
-          <span style={{ fontSize: "11px", color: "#0d8a7a" }}>Live</span>
-        </div>
-
         <button
           type="button"
           onClick={() => router.push("/dashboard/security")}

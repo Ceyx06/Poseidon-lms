@@ -87,10 +87,6 @@ export default function CoordinatorShell({ children, user }: {
             {new Date().toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "999px", background: "rgba(16,184,164,0.08)", border: "1px solid rgba(16,184,164,0.2)" }}>
-              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b8a4" }} />
-              <span style={{ fontSize: "11px", color: "#0d8a7a" }}>Live</span>
-            </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ textAlign: "right" }}>
                 <p style={{ fontSize: "13px", fontWeight: 500, color: "#1a2d45" }}>{user?.name}</p>

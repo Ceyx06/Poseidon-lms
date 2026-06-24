@@ -16,6 +16,7 @@ type FileItem = {
   sizeLabel: string;
   url: string;
   mimeType: string;
+  publicId?: string;
 };
 
 type FolderNode = {
@@ -116,6 +117,37 @@ function getNodeByPath(node: FolderNode, pathIds: string[]) {
   return current;
 }
 
+async function fetchPanstarState(section: "contracts" | "departures", vessel: string): Promise<FolderNode> {
+  const res = await fetch(`/api/panstar?section=${encodeURIComponent(section)}&vessel=${encodeURIComponent(vessel)}`, { cache: "no-store" });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || "Failed to load saved folders/files.");
+
+  const root = createFolderNode(vessel);
+  const folders = Array.isArray(data?.folders) ? data.folders : [];
+  const files = Array.isArray(data?.files) ? data.files : [];
+
+  root.folders = folders
+    .map((f: any) => ({ id: String(f.id), name: String(f.folder_name ?? ""), folders: [], files: [] as FileItem[] }))
+    .sort((a: FolderNode, b: FolderNode) => a.name.localeCompare(b.name));
+
+  const folderMap = new Map(root.folders.map((f) => [f.id, f]));
+  for (const r of files) {
+    const parent = folderMap.get(String(r.folder_id));
+    if (!parent) continue;
+    parent.files.push({
+      id: String(r.id),
+      name: String(r.file_name ?? ""),
+      uploadedAt: new Date(r.uploaded_at ?? Date.now()).toLocaleString("en-PH"),
+      sizeLabel: String(r.file_size ?? ""),
+      url: String(r.file_url ?? ""),
+      mimeType: String(r.mime_type ?? "application/octet-stream"),
+      publicId: String(r.public_id ?? ""),
+    });
+  }
+  root.folders.forEach((f) => f.files.sort((a, b) => a.name.localeCompare(b.name)));
+  return root;
+}
+
 export default function PanstarDeparturePage() {
   const [activeRoot, setActiveRoot] = useState<RootFolder | null>(null);
   const [tree, setTree] = useState<FolderNode | null>(null);
@@ -185,9 +217,16 @@ export default function PanstarDeparturePage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [tree, activeRoot, pathIds, deletedFolders]);
 
-  function openRootFolder(root: RootFolder) {
+  async function openRootFolder(root: RootFolder) {
     setActiveRoot(root);
-    setTree(createFolderNode(root.name));
+    try {
+      const loaded = await fetchPanstarState("departures", root.name);
+      setTree(loaded);
+    } catch (err) {
+      console.error(err);
+      setTree(createFolderNode(root.name));
+      alert(err instanceof Error ? err.message : "Failed to load saved data.");
+    }
     setPathIds([]);
     setNewFolderName("");
   }
@@ -199,7 +238,7 @@ export default function PanstarDeparturePage() {
     setNewFolderName("");
   }
 
-  function createSubFolder() {
+  async function createSubFolder() {
     if (!tree || !currentNode) return;
     const name = newFolderName.trim();
     if (!name) return;
@@ -212,18 +251,25 @@ export default function PanstarDeparturePage() {
       return;
     }
 
-    const path = [...pathIds];
-    setTree((prev) =>
-      prev
-        ? updateNode(prev, path, (target) => ({
-            ...target,
-            folders: [...target.folders, createFolderNode(name)].sort((a, b) =>
-              a.name.localeCompare(b.name),
-            ),
-          }))
-        : prev,
-    );
-    setNewFolderName("");
+    if (pathIds.length > 0) {
+      alert("Only one folder level is supported for PANSTAR.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/panstar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section: "departures", vessel: tree.name, folderName: name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to create folder.");
+      const dbFolder = data?.folder;
+      const node: FolderNode = { id: String(dbFolder.id), name: String(dbFolder.folder_name ?? name), folders: [], files: [] };
+      setTree((prev) => (prev ? { ...prev, folders: [...prev.folders, node].sort((a, b) => a.name.localeCompare(b.name)) } : prev));
+      setNewFolderName("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to create folder.");
+    }
   }
 
   function openSubFolder(folderId: string) {
@@ -241,13 +287,35 @@ export default function PanstarDeparturePage() {
       const incoming: FileItem[] = await Promise.all(
         Array.from(e.target.files).map(async (file) => {
           const uploaded = await uploadFileToCloud(file);
+          const path = uploadTargetRef.current ?? [...pathIds];
+          const folderId = path[path.length - 1];
+          if (!folderId) throw new Error("Please open a folder first before uploading files.");
+
+          const saveRes = await fetch("/api/panstar", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              folderId,
+              section: "departures",
+              vessel: tree.name,
+              fileName: file.name,
+              fileUrl: uploaded.url,
+              fileSize: formatFileSize(uploaded.size ?? file.size),
+              publicId: uploaded.publicId ?? null,
+              mimeType: file.type || "application/octet-stream",
+            }),
+          });
+          const saveData = await saveRes.json();
+          if (!saveRes.ok) throw new Error(saveData?.error || "Failed to save file record.");
+          const dbFile = saveData?.file;
           return {
-            id: crypto.randomUUID(),
+            id: String(dbFile?.id ?? crypto.randomUUID()),
             name: file.name,
             uploadedAt: new Date().toLocaleString("en-PH"),
-            sizeLabel: formatFileSize(uploaded.size ?? file.size),
+            sizeLabel: String(dbFile?.file_size ?? formatFileSize(uploaded.size ?? file.size)),
             url: uploaded.url,
             mimeType: file.type || "application/octet-stream",
+            publicId: String(dbFile?.public_id ?? uploaded.publicId ?? ""),
           };
         }),
       );
@@ -273,24 +341,35 @@ export default function PanstarDeparturePage() {
     }
   }
 
-  function deleteFolder(folderId: string) {
+  async function deleteFolder(folderId: string) {
     if (!tree || !currentNode) return;
     const folderToDelete = currentNode.folders.find((f) => f.id === folderId);
     if (!folderToDelete) return;
     const path = [...pathIds];
 
-    setTree((prev) =>
-      prev
-        ? updateNode(prev, path, (target) => ({
-            ...target,
-            folders: target.folders.filter((f) => f.id !== folderId),
-          }))
-        : prev,
-    );
-    setDeletedFolders((prev) => [
-      { folder: folderToDelete, parentPathIds: path, deletedAt: Date.now() },
-      ...prev.slice(0, 4),
-    ]);
+    try {
+      const res = await fetch("/api/panstar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "folder", id: folderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to delete folder.");
+      setTree((prev) =>
+        prev
+          ? updateNode(prev, path, (target) => ({
+              ...target,
+              folders: target.folders.filter((f) => f.id !== folderId),
+            }))
+          : prev,
+      );
+      setDeletedFolders((prev) => [
+        { folder: folderToDelete, parentPathIds: path, deletedAt: Date.now() },
+        ...prev.slice(0, 4),
+      ]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete folder.");
+    }
   }
 
   function restoreFolder(index: number) {
@@ -341,8 +420,22 @@ export default function PanstarDeparturePage() {
     }
   }
 
-  function deleteFile(fileId: string) {
+  async function deleteFile(fileId: string) {
     if (!tree) return;
+    const current = getNodeByPath(tree, pathIds);
+    const target = current.files.find((f) => f.id === fileId);
+    try {
+      const res = await fetch("/api/panstar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "file", id: fileId, publicId: target?.publicId || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to delete file.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete file.");
+      return;
+    }
     const path = [...pathIds];
     setTree((prev) =>
       prev
@@ -377,26 +470,26 @@ export default function PanstarDeparturePage() {
                 marginBottom: "4px",
               }}
             >
-              PANSTAR Departure Documents
+              PANSTAR departure details
             </h1>
-            <p style={{ fontSize: "13px", color: "#6a85a0" }}>
-              {breadcrumb.join(" / ")}
+            <p style={{ fontSize: "13px", color: "#6a85a0", margin: 0 }}>
+              Vessels {" > "} {tree.name === "GENIE" ? "Genie" : tree.name === "GENIE 2" ? "Genie 2" : "Panstar Miracle"}
             </p>
           </div>
           <button
             type="button"
             onClick={backToRootList}
             style={{
-              fontSize: "12px",
-              padding: "8px 12px",
-              borderRadius: "8px",
+              fontSize: "13px",
+              padding: "12px 20px",
+              borderRadius: "14px",
               border: "1px solid #d8e0ea",
               background: "#fff",
-              color: "#4d6580",
+              color: "#1f2937",
               cursor: "pointer",
             }}
           >
-            Back to Vessels
+             Back to vessels
           </button>
         </div>
 
@@ -439,17 +532,17 @@ export default function PanstarDeparturePage() {
                   type="button"
                   onClick={createSubFolder}
                   style={{
-                    fontSize: "12px",
+                    fontSize: "13px",
                     fontWeight: 700,
-                    color: "#fff",
-                    background: activeRoot.color,
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "9px 14px",
+                    color: "#1f2937",
+                    background: "#fff",
+                    border: "1px solid #d8e0ea",
+                    borderRadius: "12px",
+                    padding: "10px 18px",
                     cursor: "pointer",
                   }}
                 >
-                  Create Folder
+                   Create folder
                 </button>
               </>
             ) : (
@@ -468,7 +561,7 @@ export default function PanstarDeparturePage() {
                     cursor: "pointer",
                   }}
                 >
-                  ↑ Upload File
+                   Upload File
                 </button>
                 <button
                   type="button"
@@ -484,7 +577,7 @@ export default function PanstarDeparturePage() {
                     cursor: "pointer",
                   }}
                 >
-                  ← Back
+                   Back
                 </button>
               </>
             )}
@@ -516,9 +609,15 @@ export default function PanstarDeparturePage() {
                   fontSize: "12px",
                   letterSpacing: "0.06em",
                   color: "#5d728a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                FOLDERS
+                <span>FOLDERS</span>
+                <span style={{ fontFamily: "inherit", fontSize: "13px", color: "#6b7280", letterSpacing: 0 }}>
+                  {currentNode.folders.length} folders
+                </span>
               </div>
               {currentNode.folders.length === 0 ? (
                 <div style={{ padding: "14px", color: "#8ea1b8", fontSize: "13px" }}>
@@ -549,7 +648,7 @@ export default function PanstarDeparturePage() {
                         flex: 1,
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
+                        gap: "12px",
                         padding: "12px 14px",
                         border: "none",
                         background: "transparent",
@@ -558,10 +657,17 @@ export default function PanstarDeparturePage() {
                         textAlign: "left",
                       }}
                     >
-                      <span style={{ fontSize: "16px" }}>📁</span>
-                      <span style={{ fontWeight: 600, fontSize: "13px" }}>{folder.name}</span>
-                      <span style={{ color: "#8ea1b8", fontSize: "12px", marginLeft: "auto" }}>
-                        {folder.folders.length} folders, {folder.files.length} files
+                      <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "#dbe7f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>
+                        
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <span style={{ fontWeight: 600, fontSize: "13px" }}>{folder.name}</span>
+                        <span style={{ color: "#6b7280", fontSize: "12px" }}>
+                          {folder.files.length} files
+                        </span>
+                      </div>
+                      <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: "20px", lineHeight: 1 }}>
+                        
                       </span>
                     </button>
                     <button
@@ -574,18 +680,18 @@ export default function PanstarDeparturePage() {
                       style={{
                         flexShrink: 0,
                         margin: "0 4px 0 10px",
-                        padding: "6px 10px",
-                        fontSize: "11px",
+                        padding: "8px 16px",
+                        fontSize: "12px",
                         fontWeight: 700,
-                        color: "#1a6bbf",
-                        background: "#eef4ff",
-                        border: "1px solid #c5d9f5",
-                        borderRadius: "6px",
+                        color: "#1f2937",
+                        background: "#fff",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "12px",
                         cursor: "pointer",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      ↑ Upload
+                       Upload
                     </button>
                     <button
                       type="button"
@@ -597,18 +703,18 @@ export default function PanstarDeparturePage() {
                       style={{
                         flexShrink: 0,
                         margin: "0 10px 0 0",
-                        padding: "6px 10px",
-                        fontSize: "11px",
+                        padding: "8px 16px",
+                        fontSize: "12px",
                         fontWeight: 700,
-                        color: "#c0392b",
-                        background: "#fff0ee",
-                        border: "1px solid #f5c5c0",
-                        borderRadius: "6px",
+                        color: "#1f2937",
+                        background: "#fff",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "12px",
                         cursor: "pointer",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      🗑 Delete
+                       Delete
                     </button>
                   </div>
                 ))
@@ -654,7 +760,7 @@ export default function PanstarDeparturePage() {
                     }}
                   >
                     <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "16px" }}>📄</span>
+                      <span style={{ fontSize: "16px" }}></span>
                       <div style={{ minWidth: 0 }}>
                         <p
                           style={{
@@ -670,7 +776,7 @@ export default function PanstarDeparturePage() {
                           {file.name}
                         </p>
                         <p style={{ margin: 0, color: "#8ea1b8", fontSize: "12px" }}>
-                          {file.sizeLabel} • {file.uploadedAt}
+                          {file.sizeLabel}  {file.uploadedAt}
                         </p>
                       </div>
                     </div>
@@ -737,7 +843,7 @@ export default function PanstarDeparturePage() {
                 color: "#a07820",
               }}
             >
-              🗑 RECENTLY DELETED
+               RECENTLY DELETED
             </div>
             {deletedFolders.map((entry, i) => (
               <div
@@ -757,7 +863,7 @@ export default function PanstarDeparturePage() {
                       {entry.folder.name}
                     </p>
                     <p style={{ margin: 0, fontSize: "11px", color: "#b09040" }}>
-                      {entry.folder.folders.length} folders • {entry.folder.files.length} files • deleted{" "}
+                      {entry.folder.folders.length} folders  {entry.folder.files.length} files  deleted{" "}
                       {Math.round((Date.now() - entry.deletedAt) / 1000)}s ago
                     </p>
                   </div>
@@ -777,7 +883,7 @@ export default function PanstarDeparturePage() {
                       cursor: "pointer",
                     }}
                   >
-                    ↩ Restore
+                     Restore
                   </button>
                   <button
                     type="button"
@@ -816,10 +922,10 @@ export default function PanstarDeparturePage() {
             marginBottom: "4px",
           }}
         >
-          PANSTAR Departure Documents
+          PANSTAR departure details
         </h1>
         <p style={{ fontSize: "13px", color: "#6a85a0" }}>
-          Select a vessel folder to manage pre-departure documents
+          Select a vessel folder to manage crew departure documents
         </p>
       </div>
 
@@ -836,70 +942,36 @@ export default function PanstarDeparturePage() {
             type="button"
             onClick={() => openRootFolder(folder)}
             style={{
-              background: folder.bg,
-              border: `1.5px solid ${folder.border}`,
-              borderRadius: "18px",
-              padding: "32px 20px",
+              background: "#ffffff",
+              border: "1px solid #d7dde7",
+              borderRadius: "14px",
+              padding: "24px",
               cursor: "pointer",
-              textAlign: "center",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+              textAlign: "left",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               transition: "transform 0.15s ease, box-shadow 0.15s ease",
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
-              gap: "14px",
+              gap: "16px",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-4px)";
-              e.currentTarget.style.boxShadow = "0 10px 30px rgba(0,0,0,0.12)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.06)";
+              e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
             }}
           >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "16px",
-                background: `${folder.color}18`,
-                border: `1.5px solid ${folder.border}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "16px",
-                fontWeight: 700,
-                color: folder.color,
-              }}
-              >
-                📁
-              </div>
-
+            <div style={{ width: "66px", height: "66px", borderRadius: "16px", background: `${folder.color}20`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px" }}></div>
             <div>
-              <p
-                style={{
-                  fontFamily: "var(--font-cinzel)",
-                  fontWeight: "bold",
-                  fontSize: "13px",
-                  color: folder.color,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  margin: 0,
-                }}
-              >
-                {folder.name}
-              </p>
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: "#a0b0c0",
-                  marginTop: "4px",
-                  marginBottom: 0,
-                }}
-              >
-                Click to open
-              </p>
+              <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#1f2937" }}>{folder.name === "GENIE" ? "Genie" : folder.name === "GENIE 2" ? "Genie 2" : "Panstar Miracle"}</p>
+              <p style={{ margin: "4px 0 0", fontSize: "16px", color: "#4b5563" }}>Ferry vessel</p>
+              <span style={{ marginTop: "12px", display: "inline-block", padding: "6px 12px", borderRadius: "12px", background: `${folder.color}20`, color: folder.color, fontWeight: 700, fontSize: "14px" }}>Panstar Line</span>
+            </div>
+            <div style={{ marginTop: "4px", borderTop: "1px solid #e5e7eb", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#374151", fontSize: "12px", fontWeight: 500 }}>
+              <span>Open folder</span>
+              <span style={{ fontSize: "16px" }}></span>
             </div>
           </button>
         ))}
@@ -907,3 +979,5 @@ export default function PanstarDeparturePage() {
     </div>
   );
 }
+
+
